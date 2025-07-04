@@ -11,7 +11,13 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 
 // Set your Mapbox access token here
 // You can get a free token at https://account.mapbox.com/
-mapboxgl.accessToken = 'pk.eyJ1IjoiZXhhbXBsZSIsImEiOiJjbGV4YW1wbGUifQ.example'; // Replace with your token
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
+
+if (MAPBOX_TOKEN) {
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+} else {
+  console.warn('Mapbox access token not found. Please set VITE_MAPBOX_ACCESS_TOKEN in your .env file');
+}
 
 interface MapboxMapProps {
   sessionId: Id<"sessions">;
@@ -66,7 +72,12 @@ export function MapboxMap({ sessionId, mode = 'view' }: MapboxMapProps) {
 
   // Initialize map
   useEffect(() => {
-    if (!mapContainer.current) return;
+    if (!mapContainer.current || !MAPBOX_TOKEN) {
+      if (!MAPBOX_TOKEN) {
+        toast.error('Mapbox access token is required. Please configure VITE_MAPBOX_ACCESS_TOKEN in your environment variables.');
+      }
+      return;
+    }
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -578,6 +589,38 @@ export function MapboxMap({ sessionId, mode = 'view' }: MapboxMapProps) {
       toast.success('Location tracking disabled');
     }
   };
+
+  // Show token configuration message if no token is available
+  if (!MAPBOX_TOKEN) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🗺️</div>
+          <h3 className="text-2xl font-bold text-gray-800 mb-4">Mapbox Configuration Required</h3>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-2xl mx-auto">
+            <p className="text-yellow-800 mb-4">
+              To use the advanced mapping features, you need to configure a Mapbox access token.
+            </p>
+            <div className="text-left space-y-3">
+              <p className="font-semibold text-yellow-900">Setup Instructions:</p>
+              <ol className="list-decimal list-inside space-y-2 text-sm text-yellow-800">
+                <li>Visit <a href="https://account.mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">https://account.mapbox.com/</a> and create a free account</li>
+                <li>Navigate to your account dashboard and create a new access token</li>
+                <li>Copy the public access token (starts with "pk.")</li>
+                <li>Add it to your <code className="bg-yellow-100 px-2 py-1 rounded">.env.local</code> file as:</li>
+              </ol>
+              <div className="bg-gray-800 text-green-400 p-3 rounded font-mono text-sm mt-3">
+                VITE_MAPBOX_ACCESS_TOKEN=your_token_here
+              </div>
+              <p className="text-xs text-yellow-700 mt-2">
+                Note: Mapbox provides 50,000 free map loads per month, which is generous for most applications.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
