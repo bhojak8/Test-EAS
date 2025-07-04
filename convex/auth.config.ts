@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: process.env.CONVEX_SITE_URL,
+      domain: process.env.AUTH_DOMAIN || "https://ceaseless-trout-52.convex.site",
       applicationID: "convex",
     },
   ],
