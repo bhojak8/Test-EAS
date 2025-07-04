@@ -1,0 +1,336 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Pulsing animation for map markers */
+.pulsing-marker {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Custom styles for Leaflet markers */
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Leaflet popup styles */
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.leaflet-popup-tip {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced map container */
+.leaflet-container {
+  font-family: inherit;
+  border-radius: 8px;
+}
+
+/* Drawing cursor styles */
+.leaflet-container.drawing-mode {
+  cursor: crosshair !important;
+}
+
+.leaflet-container.drawing-mode * {
+  cursor: crosshair !important;
+}
+
+/* Touch-friendly controls */
+.leaflet-control-zoom a {
+  width: 36px;
+  height: 36px;
+  line-height: 36px;
+  font-size: 18px;
+  border-radius: 6px;
+  margin: 2px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.leaflet-control-zoom {
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Form styles */
+.input-field {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500;
+}
+
+.auth-button {
+  @apply w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+/* Alert styles */
+.alert-button {
+  @apply bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95;
+}
+
+/* Enhanced button styles */
+.btn-primary {
+  @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-all duration-200;
+}
+
+.btn-danger {
+  @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
+}
+
+.btn-success {
+  @apply bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
+}
+
+/* Drawing tool buttons */
+.drawing-tool-btn {
+  @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 border-2 border-transparent;
+}
+
+.drawing-tool-btn:hover {
+  @apply transform scale-105 shadow-md;
+}
+
+.drawing-tool-btn.active {
+  @apply shadow-lg transform scale-105;
+}
+
+/* Status indicators */
+.status-online {
+  @apply bg-green-500;
+}
+
+.status-offline {
+  @apply bg-gray-500;
+}
+
+.status-alert {
+  @apply bg-red-500;
+}
+
+/* Tab navigation */
+.tab-nav {
+  @apply flex gap-2 border-b overflow-x-auto;
+}
+
+.tab-button {
+  @apply px-4 py-2 border-b-2 whitespace-nowrap transition-all duration-200;
+}
+
+.tab-button-active {
+  @apply border-blue-600 text-blue-600;
+}
+
+.tab-button-inactive {
+  @apply border-transparent hover:text-blue-600;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white rounded-lg shadow-sm border;
+}
+
+.card-header {
+  @apply p-4 border-b;
+}
+
+.card-content {
+  @apply p-4;
+}
+
+/* Enhanced card with hover effects */
+.interactive-card {
+  @apply bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md hover:border-gray-300 cursor-pointer;
+}
+
+.interactive-card.selected {
+  @apply border-blue-500 bg-blue-50 shadow-md;
+}
+
+/* Utility classes */
+.text-truncate {
+  @apply truncate;
+}
+
+.shadow-custom {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Loading animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
+
+/* Drawing feedback animations */
+@keyframes drawingPulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.drawing-preview {
+  animation: drawingPulse 2s ease-in-out infinite;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .mobile-stack {
+    @apply flex-col;
+  }
+  
+  .mobile-full {
+    @apply w-full;
+  }
+  
+  .mobile-text-sm {
+    @apply text-sm;
+  }
+
+  /* Larger touch targets on mobile */
+  .leaflet-control-zoom a {
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+    font-size: 20px;
+  }
+
+  /* Better spacing for mobile drawing tools */
+  .drawing-tool-btn {
+    @apply px-3 py-2 text-sm;
+  }
+}
+
+@media (max-width: 640px) {
+  .leaflet-control-container .leaflet-top.leaflet-right {
+    top: 10px;
+    right: 10px;
+  }
+  
+  .leaflet-control-container .leaflet-top.leaflet-left {
+    top: 10px;
+    left: 10px;
+  }
+
+  /* Stack drawing tools vertically on very small screens */
+  .drawing-tools-mobile {
+    @apply flex-col space-y-2;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break {
+    page-break-before: always;
+  }
+}
+
+/* Focus styles for accessibility */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .btn-primary {
+    @apply border-2 border-blue-800;
+  }
+  
+  .interactive-card {
+    @apply border-2;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .drawing-tool-btn:hover {
+    @apply transform-none;
+  }
+  
+  .animate-pulse,
+  .animate-bounce,
+  .drawing-preview {
+    animation: none;
+  }
+  
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
