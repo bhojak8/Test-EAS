@@ -2,23 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Pulsing animation for map markers */
+/* Enhanced marker animations */
 .pulsing-marker {
   animation: pulse 2s infinite;
 }
 
-@keyframes pulse {
-  0% {
+.advanced-marker {
+  animation: advancedPulse 3s infinite;
+}
+
+@keyframes advancedPulse {
+  0%, 100% {
     transform: scale(1);
     opacity: 1;
   }
   50% {
-    transform: scale(1.1);
-    opacity: 0.7;
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+/* User location marker styles */
+.user-location-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.user-location-marker {
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+
+.pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: pulseRing 2s infinite;
+}
+
+.user-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: #3b82f6;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+@keyframes pulseRing {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
   }
   100% {
-    transform: scale(1);
-    opacity: 1;
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
   }
 }
 
@@ -28,10 +76,12 @@
   border: none !important;
 }
 
-/* Leaflet popup styles */
+/* Enhanced Leaflet popup styles */
 .leaflet-popup-content-wrapper {
   border-radius: 12px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95);
 }
 
 .leaflet-popup-content {
@@ -50,179 +100,20 @@
   border-radius: 8px;
 }
 
-/* Drawing cursor styles */
-.leaflet-container.drawing-mode {
-  cursor: crosshair !important;
+/* Weather overlay styles */
+.weather-overlay {
+  opacity: 0.6;
+  mix-blend-mode: multiply;
 }
 
-.leaflet-container.drawing-mode * {
-  cursor: crosshair !important;
+/* Sensor data animations */
+.sensor-data-card {
+  transition: all 0.3s ease;
 }
 
-/* Touch-friendly controls */
-.leaflet-control-zoom a {
-  width: 36px;
-  height: 36px;
-  line-height: 36px;
-  font-size: 18px;
-  border-radius: 6px;
-  margin: 2px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-.leaflet-control-zoom {
-  border: none;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Form styles */
-.input-field {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500;
-}
-
-.auth-button {
-  @apply w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed;
-}
-
-/* Alert styles */
-.alert-button {
-  @apply bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-xl shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95;
-}
-
-/* Enhanced button styles */
-.btn-primary {
-  @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
-}
-
-.btn-secondary {
-  @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-all duration-200;
-}
-
-.btn-danger {
-  @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
-}
-
-.btn-success {
-  @apply bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
-}
-
-/* Drawing tool buttons */
-.drawing-tool-btn {
-  @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 border-2 border-transparent;
-}
-
-.drawing-tool-btn:hover {
-  @apply transform scale-105 shadow-md;
-}
-
-.drawing-tool-btn.active {
-  @apply shadow-lg transform scale-105;
-}
-
-/* Status indicators */
-.status-online {
-  @apply bg-green-500;
-}
-
-.status-offline {
-  @apply bg-gray-500;
-}
-
-.status-alert {
-  @apply bg-red-500;
-}
-
-/* Tab navigation */
-.tab-nav {
-  @apply flex gap-2 border-b overflow-x-auto;
-}
-
-.tab-button {
-  @apply px-4 py-2 border-b-2 whitespace-nowrap transition-all duration-200;
-}
-
-.tab-button-active {
-  @apply border-blue-600 text-blue-600;
-}
-
-.tab-button-inactive {
-  @apply border-transparent hover:text-blue-600;
-}
-
-/* Card styles */
-.card {
-  @apply bg-white rounded-lg shadow-sm border;
-}
-
-.card-header {
-  @apply p-4 border-b;
-}
-
-.card-content {
-  @apply p-4;
-}
-
-/* Enhanced card with hover effects */
-.interactive-card {
-  @apply bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md hover:border-gray-300 cursor-pointer;
-}
-
-.interactive-card.selected {
-  @apply border-blue-500 bg-blue-50 shadow-md;
-}
-
-/* Utility classes */
-.text-truncate {
-  @apply truncate;
-}
-
-.shadow-custom {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-/* Loading animations */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-@keyframes bounce {
-  0%, 100% {
-    transform: translateY(-25%);
-    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
-  }
-  50% {
-    transform: none;
-    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
-  }
-}
-
-.animate-bounce {
-  animation: bounce 1s infinite;
-}
-
-/* Drawing feedback animations */
-@keyframes drawingPulse {
-  0%, 100% {
-    opacity: 0.3;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
-.drawing-preview {
-  animation: drawingPulse 2s ease-in-out infinite;
+.sensor-data-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Glassmorphism effects */
@@ -274,6 +165,43 @@
   animation: weatherFloat 3s ease-in-out infinite;
 }
 
+/* Touch-friendly controls */
+.leaflet-control-zoom a {
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+  font-size: 18px;
+  border-radius: 8px;
+  margin: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.leaflet-control-zoom {
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Enhanced button styles */
+.btn-primary {
+  @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-all duration-200;
+}
+
+.btn-danger {
+  @apply bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
+}
+
+.btn-success {
+  @apply bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
+}
+
 /* Mobile optimizations */
 @media (max-width: 768px) {
   .mobile-stack {
@@ -296,8 +224,8 @@
     font-size: 20px;
   }
 
-  /* Better spacing for mobile drawing tools */
-  .drawing-tool-btn {
+  /* Better spacing for mobile */
+  .sensor-data-card {
     @apply px-3 py-2 text-sm;
   }
 
@@ -316,11 +244,6 @@
   .leaflet-control-container .leaflet-top.leaflet-left {
     top: 10px;
     left: 10px;
-  }
-
-  /* Stack drawing tools vertically on very small screens */
-  .drawing-tools-mobile {
-    @apply flex-col space-y-2;
   }
 
   /* Responsive grid for quick actions */
@@ -349,17 +272,6 @@
   background: #a8a8a8;
 }
 
-/* Print styles */
-@media print {
-  .no-print {
-    display: none !important;
-  }
-  
-  .print-break {
-    page-break-before: always;
-  }
-}
-
 /* Focus styles for accessibility */
 .focus-ring {
   @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
@@ -378,15 +290,13 @@
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .drawing-tool-btn:hover {
-    @apply transform-none;
-  }
-  
+  .advanced-marker,
+  .pulsing-marker,
   .animate-pulse,
   .animate-bounce,
-  .drawing-preview,
   .emergency-pulse,
-  .weather-float {
+  .weather-float,
+  .pulse-ring {
     animation: none;
   }
   
@@ -452,15 +362,6 @@
 .fab.emergency {
   @apply bg-red-600 hover:bg-red-700;
   animation: emergencyPulse 2s infinite;
-}
-
-/* Tooltip styles */
-.tooltip {
-  @apply absolute z-50 px-2 py-1 text-sm text-white bg-gray-900 rounded shadow-lg opacity-0 pointer-events-none transition-opacity duration-200;
-}
-
-.tooltip.show {
-  @apply opacity-100;
 }
 
 /* Loading spinner */

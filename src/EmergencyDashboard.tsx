@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Id } from "../convex/_generated/dataModel";
 import { toast } from "sonner";
-import { EmergencyMap } from "./EmergencyMap";
+import { EnhancedMap } from "./EnhancedMap";
 import { AlertTypeModal } from "./AlertTypeModal";
 import { AlertButton } from "./AlertButton";
 import { GroupManagement } from "./GroupManagement";
@@ -31,7 +31,7 @@ export function EmergencyDashboard({ user }: { user: any }) {
     try {
       const sessionId = await joinByCode({ shareCode: code });
       setSelectedSession(sessionId);
-      toast.success("Joined session");
+      toast.success("Joined session successfully!");
     } catch (error) {
       toast.error("Failed to join session");
     }
@@ -47,12 +47,12 @@ export function EmergencyDashboard({ user }: { user: any }) {
         type,
         message: message || undefined,
       });
-      toast.success("Alert sent");
+      toast.success("🚨 Emergency alert sent!");
       
       // Play alert sound
       try {
         const audio = new Audio("/alert.mp3");
-        audio.volume = 0.5;
+        audio.volume = 0.7;
         audio.play().catch(console.error);
       } catch (error) {
         console.error("Failed to play alert sound:", error);
@@ -60,7 +60,7 @@ export function EmergencyDashboard({ user }: { user: any }) {
       
       // Vibrate if supported
       if (navigator.vibrate) {
-        navigator.vibrate([200, 100, 200]);
+        navigator.vibrate([200, 100, 200, 100, 200]);
       }
     } catch (error) {
       toast.error("Failed to send alert");
@@ -84,46 +84,55 @@ export function EmergencyDashboard({ user }: { user: any }) {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
+      {/* Enhanced Header */}
       <div className="flex justify-between items-center">
         <div className="flex gap-4">
           <button
             onClick={() => setView("sessions")}
-            className={`px-4 py-2 rounded-lg ${
+            className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
               view === "sessions"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 hover:bg-gray-300"
+                ? "bg-blue-600 text-white shadow-lg transform scale-105"
+                : "bg-gray-200 hover:bg-gray-300 text-gray-700"
             }`}
           >
-            Sessions
+            🚨 Emergency Sessions
           </button>
           <button
             onClick={() => setView("groups")}
-            className={`px-4 py-2 rounded-lg ${
+            className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
               view === "groups"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 hover:bg-gray-300"
+                ? "bg-blue-600 text-white shadow-lg transform scale-105"
+                : "bg-gray-200 hover:bg-gray-300 text-gray-700"
             }`}
           >
-            Groups
+            👥 Team Groups
           </button>
         </div>
       </div>
 
-      {/* Active Alerts Banner */}
+      {/* Enhanced Active Alerts Banner */}
       {activeAlerts.length > 0 && (
-        <div className="bg-red-100 border-l-4 border-red-500 p-4 rounded">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
+        <div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-6 rounded-xl shadow-lg emergency-pulse">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="text-3xl animate-bounce">🚨</div>
+              <div>
+                <h3 className="text-xl font-bold">
+                  {activeAlerts.length} ACTIVE EMERGENCY ALERT{activeAlerts.length > 1 ? 'S' : ''}
+                </h3>
+                <p className="text-red-100">
+                  {activeAlerts.length === 1 
+                    ? activeAlerts[0].message || 'Emergency situation detected'
+                    : 'Multiple emergency situations detected'
+                  }
+                </p>
+              </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">
-                <strong>🚨 {activeAlerts.length} Active Alert{activeAlerts.length > 1 ? 's' : ''}</strong>
-                {activeAlerts.length === 1 && ` - ${activeAlerts[0].message || 'Emergency alert'}`}
-              </p>
+            <div className="text-right">
+              <div className="text-sm text-red-200">Last Alert</div>
+              <div className="font-medium">
+                {new Date(Math.max(...activeAlerts.map(a => a.createdAt))).toLocaleTimeString()}
+              </div>
             </div>
           </div>
         </div>
@@ -132,20 +141,20 @@ export function EmergencyDashboard({ user }: { user: any }) {
       {view === "groups" ? (
         <GroupManagement />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           <SessionCreation />
           
           <button
             onClick={handleJoinByCode}
-            className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 font-medium text-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
           >
-            Join by Code
+            🔗 Join Emergency Session by Code
           </button>
 
           {sessions.length > 0 && (
-            <div className="bg-gray-100 rounded-lg p-4">
-              <h3 className="text-xl font-semibold mb-4">Available Sessions</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 shadow-lg">
+              <h3 className="text-2xl font-bold text-gray-800 mb-6">🚨 Available Emergency Sessions</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {sessions.map((session) => {
                   if (!session) return null;
                   const sessionAlerts = alerts.filter(a => 
@@ -156,27 +165,32 @@ export function EmergencyDashboard({ user }: { user: any }) {
                     <button
                       key={session._id}
                       onClick={() => setSelectedSession(session._id)}
-                      className={`p-4 rounded-lg text-left relative ${
+                      className={`p-6 rounded-xl text-left relative transition-all duration-200 transform hover:scale-105 ${
                         session._id === selectedSession
-                          ? "bg-blue-600 text-white"
-                          : "bg-white hover:bg-gray-50"
+                          ? "bg-blue-600 text-white shadow-xl"
+                          : "bg-white hover:bg-gray-50 shadow-lg hover:shadow-xl"
                       }`}
                     >
                       {sessionAlerts.length > 0 && (
-                        <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center">
+                        <div className="absolute -top-3 -right-3 bg-red-500 text-white text-sm rounded-full h-8 w-8 flex items-center justify-center font-bold emergency-pulse">
                           {sessionAlerts.length}
                         </div>
                       )}
-                      <div className="font-semibold">{session.name}</div>
-                      <div className="text-sm opacity-80">
-                        Created {new Date(session.createdAt).toLocaleDateString()}
+                      <div className="font-bold text-lg mb-2">{session.name}</div>
+                      <div className="text-sm opacity-80 mb-1">
+                        📅 Created {new Date(session.createdAt).toLocaleDateString()}
                       </div>
-                      <div className="text-xs opacity-60">
-                        {session.participantCount} participants
+                      <div className="text-sm opacity-70 mb-1">
+                        👥 {session.participantCount} participants
                       </div>
-                      <div className="text-xs opacity-60">
-                        Code: {session.shareCode}
+                      <div className="text-sm opacity-70 font-mono">
+                        🔑 {session.shareCode}
                       </div>
+                      {sessionAlerts.length > 0 && (
+                        <div className="mt-3 text-sm bg-red-500/20 text-red-200 px-3 py-1 rounded-full">
+                          🚨 {sessionAlerts.length} active alert{sessionAlerts.length > 1 ? 's' : ''}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -185,14 +199,22 @@ export function EmergencyDashboard({ user }: { user: any }) {
           )}
 
           {selectedSession && selectedSessionData && (
-            <div className="space-y-6">
-              <AlertButton onClick={() => setShowAlertModal(true)} />
+            <div className="space-y-8">
+              {/* Enhanced Alert Button */}
+              <div className="text-center">
+                <AlertButton onClick={() => setShowAlertModal(true)} />
+                <p className="mt-4 text-gray-600 font-medium">
+                  Tap the emergency button to send an alert to all team members
+                </p>
+              </div>
               
-              <EmergencyMap sessionId={selectedSession} />
+              {/* Enhanced Map */}
+              <EnhancedMap sessionId={selectedSession} />
 
-              <div className="bg-gray-100 rounded-lg p-4">
-                <h3 className="text-xl font-semibold mb-4">Recent Alerts</h3>
-                <div className="space-y-2">
+              {/* Enhanced Recent Alerts */}
+              <div className="bg-white rounded-xl p-6 shadow-lg">
+                <h3 className="text-2xl font-bold text-gray-800 mb-6">📋 Recent Emergency Alerts</h3>
+                <div className="space-y-4">
                   {alerts.slice(0, 10).map((alert) => {
                     const alertType = alertTypes.find(t => t.id === alert.type);
                     const isRecent = Date.now() - alert.createdAt < 300000;
@@ -200,36 +222,44 @@ export function EmergencyDashboard({ user }: { user: any }) {
                     return (
                       <div
                         key={alert._id}
-                        className={`bg-white p-4 rounded shadow-sm border-l-4 ${
-                          isRecent ? 'border-red-600 bg-red-50' : 
-                          alertType?.color.replace('bg-', 'border-') || 'border-gray-300'
+                        className={`p-6 rounded-xl shadow-sm border-l-4 transition-all duration-200 hover:shadow-md ${
+                          isRecent 
+                            ? 'border-red-600 bg-red-50 emergency-pulse' 
+                            : alertType?.color.replace('bg-', 'border-') + ' bg-white' || 'border-gray-300 bg-white'
                         }`}
                       >
-                        <div className="font-semibold">
-                          {alertType?.emoji} {alertType?.label}
-                          {isRecent && <span className="ml-2 text-red-600 text-sm">🔴 ACTIVE</span>}
-                        </div>
-                        {alert.message && (
-                          <div className="text-gray-600 mt-1">{alert.message}</div>
-                        )}
-                        <div className="flex justify-between items-center mt-2">
-                          <div className="text-sm text-gray-500">
-                            {new Date(alert.createdAt).toLocaleString()}
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="font-bold text-lg mb-2">
+                              {alertType?.emoji} {alertType?.label}
+                              {isRecent && (
+                                <span className="ml-3 text-red-600 text-sm font-medium bg-red-100 px-3 py-1 rounded-full">
+                                  🔴 ACTIVE
+                                </span>
+                              )}
+                            </div>
+                            {alert.message && (
+                              <div className="text-gray-700 mb-3 text-lg">{alert.message}</div>
+                            )}
+                            <div className="text-sm text-gray-500">
+                              📅 {new Date(alert.createdAt).toLocaleString()}
+                            </div>
                           </div>
-                          <div className="flex gap-2">
-                            <span className="text-xs text-gray-500">
-                              {alert.acknowledged.length} acknowledged
+                          
+                          <div className="flex flex-col items-end space-y-2">
+                            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                              ✅ {alert.acknowledged.length} acknowledged
                             </span>
                             <button
                               onClick={() => handleAcknowledge(alert._id)}
-                              className={`px-3 py-1 rounded text-sm ${
+                              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                                 alert.acknowledged.includes(user._id)
-                                  ? "bg-gray-100 text-gray-500"
-                                  : "bg-green-100 text-green-700 hover:bg-green-200"
+                                  ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                  : "bg-green-600 text-white hover:bg-green-700 shadow-md hover:shadow-lg transform hover:scale-105"
                               }`}
                               disabled={alert.acknowledged.includes(user._id)}
                             >
-                              {alert.acknowledged.includes(user._id) ? "✓ Acknowledged" : "Acknowledge"}
+                              {alert.acknowledged.includes(user._id) ? "✓ Acknowledged" : "👍 Acknowledge"}
                             </button>
                           </div>
                         </div>
@@ -237,8 +267,10 @@ export function EmergencyDashboard({ user }: { user: any }) {
                     );
                   })}
                   {alerts.length === 0 && (
-                    <div className="text-gray-500 text-center py-4">
-                      No alerts yet
+                    <div className="text-center text-gray-500 py-12">
+                      <div className="text-6xl mb-4">🕊️</div>
+                      <p className="text-xl">No emergency alerts yet</p>
+                      <p className="text-gray-400">All clear - no emergencies reported</p>
                     </div>
                   )}
                 </div>
@@ -259,7 +291,7 @@ export function EmergencyDashboard({ user }: { user: any }) {
             />
           )}
 
-          {/* Chat Component */}
+          {/* Enhanced Chat Component */}
           {selectedSession && (
             <SessionChat sessionId={selectedSession} user={user} />
           )}
