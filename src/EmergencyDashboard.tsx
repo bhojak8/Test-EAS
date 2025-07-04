@@ -8,17 +8,12 @@ import { AlertTypeModal } from "./AlertTypeModal";
 import { AlertButton } from "./AlertButton";
 import { GroupManagement } from "./GroupManagement";
 import { SessionCreation } from "./SessionCreation";
-import { ApiKeyManager } from "./ApiKeyManager";
-import { NotificationCenter } from "./NotificationCenter";
-import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { SessionChat } from "./SessionChat";
-import { GeofenceManager } from "./GeofenceManager";
 
 export function EmergencyDashboard({ user }: { user: any }) {
   const [selectedSession, setSelectedSession] = useState<Id<"sessions"> | null>(null);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [view, setView] = useState<"sessions" | "groups">("sessions");
-  const [sessionTab, setSessionTab] = useState<"overview" | "geofences" | "api" | "analytics" | "contacts">("overview");
   
   const sessions = useQuery(api.sessions.listSessions) || [];
   const alerts = useQuery(api.alerts.getSessionAlerts, 
@@ -57,6 +52,7 @@ export function EmergencyDashboard({ user }: { user: any }) {
       // Play alert sound
       try {
         const audio = new Audio("/alert.mp3");
+        audio.volume = 0.5;
         audio.play().catch(console.error);
       } catch (error) {
         console.error("Failed to play alert sound:", error);
@@ -88,7 +84,7 @@ export function EmergencyDashboard({ user }: { user: any }) {
 
   return (
     <div className="space-y-8">
-      {/* Header with Notification Center */}
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div className="flex gap-4">
           <button
@@ -112,10 +108,6 @@ export function EmergencyDashboard({ user }: { user: any }) {
             Groups
           </button>
         </div>
-        
-        {selectedSession && (
-          <NotificationCenter sessionId={selectedSession} userId={user._id} />
-        )}
       </div>
 
       {/* Active Alerts Banner */}
@@ -194,127 +186,63 @@ export function EmergencyDashboard({ user }: { user: any }) {
 
           {selectedSession && selectedSessionData && (
             <div className="space-y-6">
-              {/* Session Tabs */}
-              <div className="flex gap-2 border-b overflow-x-auto">
-                <button
-                  onClick={() => setSessionTab("overview")}
-                  className={`px-4 py-2 border-b-2 whitespace-nowrap ${
-                    sessionTab === "overview"
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent hover:text-blue-600"
-                  }`}
-                >
-                  📍 Overview
-                </button>
-                <button
-                  onClick={() => setSessionTab("geofences")}
-                  className={`px-4 py-2 border-b-2 whitespace-nowrap ${
-                    sessionTab === "geofences"
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent hover:text-blue-600"
-                  }`}
-                >
-                  🗺️ Geofences
-                </button>
-                {selectedSessionData.isAdmin && (
-                  <>
-                    <button
-                      onClick={() => setSessionTab("analytics")}
-                      className={`px-4 py-2 border-b-2 whitespace-nowrap ${
-                        sessionTab === "analytics"
-                          ? "border-blue-600 text-blue-600"
-                          : "border-transparent hover:text-blue-600"
-                      }`}
-                    >
-                      📊 Analytics
-                    </button>
-                    <button
-                      onClick={() => setSessionTab("api")}
-                      className={`px-4 py-2 border-b-2 whitespace-nowrap ${
-                        sessionTab === "api"
-                          ? "border-blue-600 text-blue-600"
-                          : "border-transparent hover:text-blue-600"
-                      }`}
-                    >
-                      🔑 API Keys
-                    </button>
-                  </>
-                )}
-              </div>
+              <AlertButton onClick={() => setShowAlertModal(true)} />
+              
+              <EmergencyMap sessionId={selectedSession} />
 
-              {sessionTab === "overview" && (
-                <>
-                  <AlertButton onClick={() => setShowAlertModal(true)} />
-                  
-                  <EmergencyMap sessionId={selectedSession} />
-
-                  <div className="bg-gray-100 rounded-lg p-4">
-                    <h3 className="text-xl font-semibold mb-4">Recent Alerts</h3>
-                    <div className="space-y-2">
-                      {alerts.slice(0, 10).map((alert) => {
-                        const alertType = alertTypes.find(t => t.id === alert.type);
-                        const isRecent = Date.now() - alert.createdAt < 300000;
-                        
-                        return (
-                          <div
-                            key={alert._id}
-                            className={`bg-white p-4 rounded shadow-sm border-l-4 ${
-                              isRecent ? 'border-red-600 bg-red-50' : 
-                              alertType?.color.replace('bg-', 'border-') || 'border-gray-300'
-                            }`}
-                          >
-                            <div className="font-semibold">
-                              {alertType?.emoji} {alertType?.label}
-                              {isRecent && <span className="ml-2 text-red-600 text-sm">🔴 ACTIVE</span>}
-                            </div>
-                            {alert.message && (
-                              <div className="text-gray-600 mt-1">{alert.message}</div>
-                            )}
-                            <div className="flex justify-between items-center mt-2">
-                              <div className="text-sm text-gray-500">
-                                {new Date(alert.createdAt).toLocaleString()}
-                              </div>
-                              <div className="flex gap-2">
-                                <span className="text-xs text-gray-500">
-                                  {alert.acknowledged.length} acknowledged
-                                </span>
-                                <button
-                                  onClick={() => handleAcknowledge(alert._id)}
-                                  className={`px-3 py-1 rounded text-sm ${
-                                    alert.acknowledged.includes(user._id)
-                                      ? "bg-gray-100 text-gray-500"
-                                      : "bg-green-100 text-green-700 hover:bg-green-200"
-                                  }`}
-                                  disabled={alert.acknowledged.includes(user._id)}
-                                >
-                                  {alert.acknowledged.includes(user._id) ? "✓ Acknowledged" : "Acknowledge"}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {alerts.length === 0 && (
-                        <div className="text-gray-500 text-center py-4">
-                          No alerts yet
+              <div className="bg-gray-100 rounded-lg p-4">
+                <h3 className="text-xl font-semibold mb-4">Recent Alerts</h3>
+                <div className="space-y-2">
+                  {alerts.slice(0, 10).map((alert) => {
+                    const alertType = alertTypes.find(t => t.id === alert.type);
+                    const isRecent = Date.now() - alert.createdAt < 300000;
+                    
+                    return (
+                      <div
+                        key={alert._id}
+                        className={`bg-white p-4 rounded shadow-sm border-l-4 ${
+                          isRecent ? 'border-red-600 bg-red-50' : 
+                          alertType?.color.replace('bg-', 'border-') || 'border-gray-300'
+                        }`}
+                      >
+                        <div className="font-semibold">
+                          {alertType?.emoji} {alertType?.label}
+                          {isRecent && <span className="ml-2 text-red-600 text-sm">🔴 ACTIVE</span>}
                         </div>
-                      )}
+                        {alert.message && (
+                          <div className="text-gray-600 mt-1">{alert.message}</div>
+                        )}
+                        <div className="flex justify-between items-center mt-2">
+                          <div className="text-sm text-gray-500">
+                            {new Date(alert.createdAt).toLocaleString()}
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="text-xs text-gray-500">
+                              {alert.acknowledged.length} acknowledged
+                            </span>
+                            <button
+                              onClick={() => handleAcknowledge(alert._id)}
+                              className={`px-3 py-1 rounded text-sm ${
+                                alert.acknowledged.includes(user._id)
+                                  ? "bg-gray-100 text-gray-500"
+                                  : "bg-green-100 text-green-700 hover:bg-green-200"
+                              }`}
+                              disabled={alert.acknowledged.includes(user._id)}
+                            >
+                              {alert.acknowledged.includes(user._id) ? "✓ Acknowledged" : "Acknowledge"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {alerts.length === 0 && (
+                    <div className="text-gray-500 text-center py-4">
+                      No alerts yet
                     </div>
-                  </div>
-                </>
-              )}
-
-              {sessionTab === "geofences" && (
-                <GeofenceManager sessionId={selectedSession} />
-              )}
-
-              {sessionTab === "analytics" && selectedSessionData.isAdmin && (
-                <AnalyticsDashboard sessionId={selectedSession} />
-              )}
-
-              {sessionTab === "api" && selectedSessionData.isAdmin && (
-                <ApiKeyManager sessionId={selectedSession} />
-              )}
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

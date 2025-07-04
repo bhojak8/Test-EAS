@@ -56,7 +56,6 @@ function createCustomIcon(name: string, alertStatus: 'none' | 'active' | 'acknow
 export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
   const locations = useQuery(api.locations.getSessionLocations, { sessionId }) || [];
   const alerts = useQuery(api.alerts.getSessionAlerts, { sessionId }) || [];
-  const geofences = useQuery(api.geofences.getSessionGeofences, { sessionId }) || [];
   const sessions = useQuery(api.sessions.listSessions) || [];
   const session = sessions.find(s => s && s._id === sessionId);
   const updateLocation = useMutation(api.locations.updateLocation);
@@ -65,7 +64,6 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef<{ [key: string]: L.Marker }>({});
-  const geofenceLayers = useRef<{ [key: string]: L.Layer }>({});
   const [showList, setShowList] = useState(true);
   const [mapStyle, setMapStyle] = useState('streets');
   const [trackingMode, setTrackingMode] = useState<'none' | 'follow' | 'center'>('none');
@@ -155,10 +153,6 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
     Object.values(markers.current).forEach(marker => marker.remove());
     markers.current = {};
 
-    // Clear old geofence layers
-    Object.values(geofenceLayers.current).forEach(layer => map.current?.removeLayer(layer));
-    geofenceLayers.current = {};
-
     // Add markers for all locations
     locations.forEach(member => {
       if (member.location) {
@@ -203,71 +197,15 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
       }
     });
 
-    // Add geofence layers
-    geofences.forEach(geofence => {
-      let layer: L.Layer | null = null;
-
-      const getGeofenceColor = (type: string) => {
-        switch (type) {
-          case 'safe_zone': return { color: '#059669', fillColor: '#10b981' };
-          case 'restricted_zone': return { color: '#dc2626', fillColor: '#ef4444' };
-          case 'alert_zone': return { color: '#d97706', fillColor: '#f59e0b' };
-          default: return { color: '#4b5563', fillColor: '#6b7280' };
-        }
-      };
-
-      const colors = getGeofenceColor(geofence.type);
-
-      if (geofence.shape === 'circle' && geofence.center && geofence.radius) {
-        layer = L.circle([geofence.center.lat, geofence.center.lng], {
-          radius: geofence.radius,
-          color: colors.color,
-          fillColor: colors.fillColor,
-          fillOpacity: 0.25,
-          weight: 3,
-          opacity: 0.8
-        });
-      } else if (geofence.shape === 'polygon' && geofence.coordinates && geofence.coordinates.length >= 3) {
-        const latLngs = geofence.coordinates.map(coord => [coord.lat, coord.lng] as [number, number]);
-        layer = L.polygon(latLngs, {
-          color: colors.color,
-          fillColor: colors.fillColor,
-          fillOpacity: 0.25,
-          weight: 3,
-          opacity: 0.8,
-          smoothFactor: 1.0
-        });
-      }
-
-      if (layer) {
-        layer.addTo(map.current!);
-        
-        const popupContent = `
-          <div class="p-2">
-            <h3 class="font-semibold">${geofence.name}</h3>
-            <p class="text-sm">${geofence.type.replace('_', ' ').toUpperCase()}</p>
-            ${geofence.shape === 'circle' ? `<p class="text-xs">Radius: ${geofence.radius}m</p>` : `<p class="text-xs">Polygon: ${geofence.coordinates?.length} points</p>`}
-            ${geofence.description ? `<p class="text-xs mt-1">${geofence.description}</p>` : ''}
-          </div>
-        `;
-        
-        layer.bindPopup(popupContent);
-        geofenceLayers.current[geofence._id] = layer;
-      }
-    });
-
     // Auto-fit bounds based on tracking mode
-    if (trackingMode === 'center' && (locations.length > 0 || geofences.length > 0)) {
-      const group = new L.FeatureGroup([
-        ...Object.values(markers.current),
-        ...Object.values(geofenceLayers.current)
-      ]);
+    if (trackingMode === 'center' && locations.length > 0) {
+      const group = new L.FeatureGroup(Object.values(markers.current));
       
       if (group.getLayers().length > 0) {
         map.current.fitBounds(group.getBounds(), { padding: [20, 20] });
       }
     }
-  }, [locations, alerts, session?.alertTypes, geofences, trackingMode]);
+  }, [locations, alerts, session?.alertTypes, trackingMode]);
 
   // Add measurement event handler
   useEffect(() => {
@@ -411,33 +349,11 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
 
   const fitAllMarkers = () => {
     if (!map.current || locations.length === 0) return;
-    const group = new L.FeatureGroup([
-      ...Object.values(markers.current),
-      ...Object.values(geofenceLayers.current)
-    ]);
+    const group = new L.FeatureGroup(Object.values(markers.current));
     if (group.getLayers().length > 0) {
       map.current.fitBounds(group.getBounds(), { padding: [20, 20] });
       toast.success("Map centered on all locations");
     }
-  };
-
-  const exportData = () => {
-    const data = {
-      session: session?.name,
-      timestamp: new Date().toISOString(),
-      locations,
-      alerts: alerts.slice(0, 50),
-      geofences,
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `emergency-session-${session?.name}-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Data exported");
   };
 
   return (
@@ -526,14 +442,6 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
           >
             📏 Measure
           </button>
-
-          {/* Export Data */}
-          <button
-            onClick={exportData}
-            className="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
-          >
-            📊 Export
-          </button>
           
           <button
             onClick={toggleLocation}
@@ -584,7 +492,6 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
         <div className="flex gap-4">
           <span>👥 {locations.length} members</span>
           <span>🚨 {alerts.filter(a => Date.now() - a.createdAt < 60000).length} active alerts</span>
-          <span>📍 {geofences.length} geofences</span>
         </div>
         <div className="flex gap-2">
           <span className="flex items-center gap-1">
@@ -598,18 +505,6 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
           <span className="flex items-center gap-1">
             <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
             Offline
-          </span>
-          <span className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            Safe Zone
-          </span>
-          <span className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            Restricted
-          </span>
-          <span className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-            Alert Zone
           </span>
         </div>
       </div>
