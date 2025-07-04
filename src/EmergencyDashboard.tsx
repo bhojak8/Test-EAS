@@ -13,12 +13,18 @@ import { NotificationCenter } from "./NotificationCenter";
 import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { SessionChat } from "./SessionChat";
 import { GeofenceManager } from "./GeofenceManager";
+import { LocationTracker } from "./components/LocationTracker";
+import { EmergencyContacts } from "./components/EmergencyContacts";
+import { WeatherWidget } from "./components/WeatherWidget";
+import { QuickActions } from "./components/QuickActions";
+import { OfflineMode } from "./components/OfflineMode";
 
 export function EmergencyDashboard({ user }: { user: any }) {
   const [selectedSession, setSelectedSession] = useState<Id<"sessions"> | null>(null);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [view, setView] = useState<"sessions" | "groups">("sessions");
-  const [sessionTab, setSessionTab] = useState<"overview" | "geofences" | "api" | "analytics">("overview");
+  const [sessionTab, setSessionTab] = useState<"overview" | "geofences" | "api" | "analytics" | "contacts">("overview");
+  const [locationTracking, setLocationTracking] = useState(false);
   
   const sessions = useQuery(api.sessions.listSessions) || [];
   const alerts = useQuery(api.alerts.getSessionAlerts, 
@@ -88,6 +94,9 @@ export function EmergencyDashboard({ user }: { user: any }) {
 
   return (
     <div className="space-y-8">
+      {/* Offline Mode Indicator */}
+      <OfflineMode />
+
       {/* Header with Notification Center */}
       <div className="flex justify-between items-center">
         <div className="flex gap-4">
@@ -216,6 +225,16 @@ export function EmergencyDashboard({ user }: { user: any }) {
                 >
                   🗺️ Geofences
                 </button>
+                <button
+                  onClick={() => setSessionTab("contacts")}
+                  className={`px-4 py-2 border-b-2 whitespace-nowrap ${
+                    sessionTab === "contacts"
+                      ? "border-blue-600 text-blue-600"
+                      : "border-transparent hover:text-blue-600"
+                  }`}
+                >
+                  📞 Contacts
+                </button>
                 {selectedSessionData.isAdmin && (
                   <>
                     <button
@@ -244,8 +263,26 @@ export function EmergencyDashboard({ user }: { user: any }) {
 
               {sessionTab === "overview" && (
                 <>
-                  <AlertButton onClick={() => setShowAlertModal(true)} />
-                  
+                  {/* Quick Actions and Widgets Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-6">
+                      <QuickActions 
+                        sessionId={selectedSession} 
+                        onEmergencyAlert={() => setShowAlertModal(true)} 
+                      />
+                      
+                      <LocationTracker
+                        sessionId={selectedSession}
+                        isActive={locationTracking}
+                        onToggle={() => setLocationTracking(!locationTracking)}
+                      />
+                    </div>
+                    
+                    <div className="space-y-6">
+                      <WeatherWidget />
+                    </div>
+                  </div>
+
                   <EmergencyMap sessionId={selectedSession} />
 
                   <div className="bg-gray-100 rounded-lg p-4">
@@ -306,6 +343,10 @@ export function EmergencyDashboard({ user }: { user: any }) {
 
               {sessionTab === "geofences" && (
                 <GeofenceManager sessionId={selectedSession} />
+              )}
+
+              {sessionTab === "contacts" && (
+                <EmergencyContacts />
               )}
 
               {sessionTab === "analytics" && selectedSessionData.isAdmin && (
