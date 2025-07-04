@@ -16,7 +16,7 @@ L.Icon.Default.mergeOptions({
 
 type GeofenceType = "safe_zone" | "restricted_zone" | "alert_zone";
 type GeofenceShape = "circle" | "polygon";
-type DrawingTool = "none" | "circle" | "polygon" | "marker" | "line";
+type DrawingTool = "none" | "circle" | "polygon";
 
 interface GeofenceFormData {
   name: string;
@@ -39,7 +39,7 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
   const map = useRef<L.Map | null>(null);
   const geofenceLayers = useRef<{ [key: string]: L.Layer }>({});
   const drawingLayer = useRef<L.Layer | null>(null);
-  const drawingLayers = useRef<L.Layer[]>([]);
+  const tileLayer = useRef<L.TileLayer | null>(null);
 
   const [activeTab, setActiveTab] = useState<'create' | 'manage' | 'analytics'>('create');
   const [drawingTool, setDrawingTool] = useState<DrawingTool>('none');
@@ -65,44 +65,56 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
 
   // Initialize map
   useEffect(() => {
-    if (!mapContainer.current) return;
+    if (!mapContainer.current || map.current) return;
+
+    console.log("Initializing geofence map...");
 
     map.current = L.map(mapContainer.current, {
       zoomControl: true,
       attributionControl: true,
-      touchZoom: true,
       doubleClickZoom: false, // Disable to prevent interference with drawing
-    }).setView([40.7128, -74.0060], 10);
+    }).setView([40.7128, -74.0060], 12);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Add tile layer
+    tileLayer.current = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map.current);
+    });
+    
+    tileLayer.current.addTo(map.current);
 
-    // Add drawing event handlers
+    // Setup drawing event handlers
     setupDrawingHandlers();
+
+    toast.success("Geofence map initialized! Ready to draw zones.");
 
     const mapInstance = map.current;
     return () => {
-      mapInstance.remove();
-      map.current = null;
+      if (mapInstance) {
+        mapInstance.remove();
+        map.current = null;
+      }
     };
   }, []);
 
   const setupDrawingHandlers = () => {
     if (!map.current) return;
 
-    // Mouse/touch events for drawing
+    console.log("Setting up drawing handlers...");
+
+    // Remove any existing event listeners
+    map.current.off('click');
+    map.current.off('mousemove');
+    map.current.off('dblclick');
+
+    // Add drawing event handlers
     map.current.on('click', handleMapClick);
     map.current.on('mousemove', handleMapMouseMove);
     map.current.on('dblclick', handleMapDoubleClick);
-    
-    // Touch events for mobile
-    map.current.on('touchstart', handleTouchStart);
-    map.current.on('touchmove', handleTouchMove);
-    map.current.on('touchend', handleTouchEnd);
   };
 
   const handleMapClick = (e: L.LeafletMouseEvent) => {
+    console.log("Map clicked:", e.latlng, "Drawing tool:", drawingTool);
+    
     if (drawingTool === 'none') return;
 
     const point = { lat: e.latlng.lat, lng: e.latlng.lng };
@@ -114,9 +126,6 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
       case 'polygon':
         handlePolygonDrawing(point);
         break;
-      case 'marker':
-        handleMarkerDrawing(point);
-        break;
     }
   };
 
@@ -127,38 +136,16 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
   };
 
   const handleMapDoubleClick = (e: L.LeafletMouseEvent) => {
+    console.log("Map double-clicked");
     e.originalEvent.preventDefault();
     if (drawingTool === 'polygon' && polygonPoints.length >= 3) {
       finishPolygonDrawing();
     }
   };
 
-  const handleTouchStart = (e: any) => {
-    if (drawingTool !== 'none' && e.originalEvent) {
-      e.originalEvent.preventDefault();
-    }
-  };
-
-  const handleTouchMove = (e: any) => {
-    if (drawingTool === 'circle' && circleCenter && isDrawing && e.originalEvent) {
-      const touch = (e.originalEvent as TouchEvent).touches[0];
-      if (touch) {
-        const point = map.current!.mouseEventToLatLng({
-          clientX: touch.clientX,
-          clientY: touch.clientY
-        } as any);
-        updateCirclePreview(point);
-      }
-    }
-  };
-
-  const handleTouchEnd = (e: any) => {
-    if (drawingTool !== 'none' && e.originalEvent) {
-      e.originalEvent.preventDefault();
-    }
-  };
-
   const handleCircleDrawing = (point: { lat: number; lng: number }) => {
+    console.log("Circle drawing:", point, "Center:", circleCenter);
+    
     if (!circleCenter) {
       // First click - set center
       setCircleCenter(point);
@@ -173,26 +160,31 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
         weight: 4,
         opacity: 0.9,
         dashArray: '8, 4'
-      }).addTo(map.current!);
+      });
       
-      drawingLayer.current = preview;
-      toast.info("Circle center placed. Move mouse to adjust size, click to finish.");
+      if (map.current) {
+        preview.addTo(map.current);
+        drawingLayer.current = preview;
+      }
+      
+      toast.info("✅ Circle center placed! Move mouse to adjust size, click again to finish.");
     } else {
       // Second click - finish circle
       const distance = map.current!.distance([circleCenter.lat, circleCenter.lng], [point.lat, point.lng]);
-      setCircleRadius(Math.round(distance));
-      finishCircleDrawing(Math.round(distance));
+      const finalRadius = Math.max(10, Math.round(distance)); // Minimum 10m radius
+      setCircleRadius(finalRadius);
+      finishCircleDrawing(finalRadius);
     }
   };
 
   const updateCirclePreview = (point: L.LatLng) => {
-    if (!circleCenter || !drawingLayer.current) return;
+    if (!circleCenter || !drawingLayer.current || !map.current) return;
     
-    const distance = map.current!.distance([circleCenter.lat, circleCenter.lng], [point.lat, point.lng]);
-    const newRadius = Math.round(distance);
+    const distance = map.current.distance([circleCenter.lat, circleCenter.lng], [point.lat, point.lng]);
+    const newRadius = Math.max(10, Math.round(distance)); // Minimum 10m radius
     
     // Remove old preview
-    map.current!.removeLayer(drawingLayer.current);
+    map.current.removeLayer(drawingLayer.current);
     
     // Add new preview
     const preview = L.circle([circleCenter.lat, circleCenter.lng], {
@@ -203,14 +195,17 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
       weight: 4,
       opacity: 0.9,
       dashArray: '8, 4'
-    }).addTo(map.current!);
+    });
     
+    preview.addTo(map.current);
     drawingLayer.current = preview;
     setCircleRadius(newRadius);
   };
 
   const finishCircleDrawing = (radius: number) => {
     if (!circleCenter) return;
+    
+    console.log("Finishing circle drawing:", circleCenter, radius);
     
     setTempGeofence({
       type: 'circle',
@@ -221,16 +216,34 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
     setFormData({ ...formData, shape: 'circle', radius });
     setIsDrawing(false);
     setShowDrawingPanel(true);
-    toast.success(`Circle created with radius ${radius}m. Configure and save.`);
+    
+    // Update the drawing layer to be solid (not dashed)
+    if (drawingLayer.current && map.current) {
+      map.current.removeLayer(drawingLayer.current);
+      const finalCircle = L.circle([circleCenter.lat, circleCenter.lng], {
+        radius: radius,
+        color: '#059669',
+        fillColor: '#10b981',
+        fillOpacity: 0.25,
+        weight: 3,
+        opacity: 0.8
+      });
+      finalCircle.addTo(map.current);
+      drawingLayer.current = finalCircle;
+    }
+    
+    toast.success(`🎯 Circle created! Radius: ${radius}m. Configure and save below.`);
   };
 
   const handlePolygonDrawing = (point: { lat: number; lng: number }) => {
+    console.log("Polygon drawing:", point, "Current points:", polygonPoints.length);
+    
     const newPoints = [...polygonPoints, point];
     setPolygonPoints(newPoints);
     
     if (newPoints.length === 1) {
       setIsDrawing(true);
-      toast.info("Polygon started. Continue clicking to add points, double-click to finish.");
+      toast.info("📐 Polygon started! Continue clicking to add points, double-click to finish.");
     }
     
     updatePolygonPreview(newPoints);
@@ -244,9 +257,11 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
   };
 
   const updatePolygonPreview = (points: Array<{ lat: number; lng: number }>) => {
+    if (!map.current) return;
+    
     // Remove old preview
     if (drawingLayer.current) {
-      map.current!.removeLayer(drawingLayer.current);
+      map.current.removeLayer(drawingLayer.current);
     }
     
     if (points.length < 2) return;
@@ -274,7 +289,7 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
       });
     }
     
-    preview.addTo(map.current!);
+    preview.addTo(map.current);
     drawingLayer.current = preview;
   };
 
@@ -284,6 +299,8 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
       return;
     }
     
+    console.log("Finishing polygon drawing:", polygonPoints);
+    
     setTempGeofence({
       type: 'polygon',
       coordinates: polygonPoints,
@@ -292,16 +309,28 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
     setFormData({ ...formData, shape: 'polygon' });
     setIsDrawing(false);
     setShowDrawingPanel(true);
-    toast.success(`Polygon created with ${polygonPoints.length} points. Configure and save.`);
-  };
-
-  const handleMarkerDrawing = (point: { lat: number; lng: number }) => {
-    const marker = L.marker([point.lat, point.lng]).addTo(map.current!);
-    drawingLayers.current.push(marker);
-    toast.success("Marker added");
+    
+    // Update the drawing layer to be solid (not dashed)
+    if (drawingLayer.current && map.current) {
+      map.current.removeLayer(drawingLayer.current);
+      const latLngs = polygonPoints.map(p => [p.lat, p.lng] as [number, number]);
+      const finalPolygon = L.polygon(latLngs, {
+        color: '#059669',
+        fillColor: '#10b981',
+        fillOpacity: 0.25,
+        weight: 3,
+        opacity: 0.8
+      });
+      finalPolygon.addTo(map.current);
+      drawingLayer.current = finalPolygon;
+    }
+    
+    toast.success(`📐 Polygon created with ${polygonPoints.length} points! Configure and save below.`);
   };
 
   const startDrawing = (tool: DrawingTool) => {
+    console.log("Starting drawing tool:", tool);
+    
     if (tool === drawingTool) {
       // Toggle off if same tool
       cancelDrawing();
@@ -321,21 +350,17 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
     
     switch (tool) {
       case 'circle':
-        toast.info("🎯 Circle Mode: Click to place center, then click again to set radius");
+        toast.info("🎯 Circle Mode Active: Click to place center, then click again to set radius");
         break;
       case 'polygon':
-        toast.info("📐 Polygon Mode: Click to add points, double-click to finish");
-        break;
-      case 'marker':
-        toast.info("📍 Marker Mode: Click to place markers");
-        break;
-      case 'line':
-        toast.info("📏 Line Mode: Click to draw lines");
+        toast.info("📐 Polygon Mode Active: Click to add points, double-click to finish");
         break;
     }
   };
 
   const cancelDrawing = () => {
+    console.log("Canceling drawing");
+    
     setDrawingTool('none');
     setIsDrawing(false);
     setCircleCenter(null);
@@ -355,18 +380,7 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
       drawingLayer.current = null;
     }
     
-    // Clear all drawing layers
-    drawingLayers.current.forEach(layer => {
-      if (map.current) {
-        map.current.removeLayer(layer);
-      }
-    });
-    drawingLayers.current = [];
-  };
-
-  const clearAllDrawings = () => {
-    cancelDrawing();
-    toast.info("All drawings cleared");
+    toast.info("Drawing cancelled");
   };
 
   const centerOnMyLocation = () => {
@@ -379,7 +393,7 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
       (position) => {
         if (map.current) {
           map.current.setView([position.coords.latitude, position.coords.longitude], 16);
-          toast.success("Centered on your location");
+          toast.success("📍 Centered on your location");
         }
       },
       (error) => {
@@ -409,7 +423,7 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
         });
       }
       
-      toast.info("Last point removed");
+      toast.info("↶ Last point removed");
     }
   };
 
@@ -564,10 +578,10 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
           geofenceId: editingGeofence,
           ...geofenceData,
         });
-        toast.success("Geofence updated successfully!");
+        toast.success("✅ Geofence updated successfully!");
       } else {
         await createGeofence(geofenceData);
-        toast.success("Geofence created successfully!");
+        toast.success("✅ Geofence created successfully!");
       }
       
       // Reset form
@@ -647,7 +661,7 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
       {/* Drawing Tools Bar */}
       <div className="bg-white rounded-lg p-4 shadow-sm border">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm font-medium text-gray-700">Drawing Tools:</span>
+          <span className="text-sm font-medium text-gray-700">🎨 Drawing Tools:</span>
           
           <button
             onClick={() => startDrawing('circle')}
@@ -670,17 +684,6 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
           >
             📐 Polygon
           </button>
-          
-          <button
-            onClick={() => startDrawing('marker')}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-              drawingTool === 'marker'
-                ? "bg-green-600 text-white shadow-lg"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-            }`}
-          >
-            📍 Marker
-          </button>
 
           <div className="h-6 w-px bg-gray-300 mx-2"></div>
 
@@ -689,7 +692,7 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
               onClick={undoLastPoint}
               className="px-3 py-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition-colors"
             >
-              ↶ Undo Point
+              ↶ Undo Point ({polygonPoints.length})
             </button>
           )}
 
@@ -698,18 +701,16 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
               onClick={cancelDrawing}
               className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
             >
-              ✕ Cancel
+              ✕ Cancel Drawing
             </button>
           )}
 
-          {drawingLayers.current.length > 0 && (
-            <button
-              onClick={clearAllDrawings}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              🗑️ Clear All
-            </button>
-          )}
+          <button
+            onClick={centerOnMyLocation}
+            className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+          >
+            📍 My Location
+          </button>
         </div>
       </div>
 
@@ -718,26 +719,23 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
             <div className="text-blue-600 text-2xl">
-              {drawingTool === 'circle' ? '⭕' : drawingTool === 'polygon' ? '📐' : '📍'}
+              {drawingTool === 'circle' ? '⭕' : '📐'}
             </div>
             <div className="text-blue-800">
               {drawingTool === 'circle' && !circleCenter && (
-                <span className="font-medium">Click on the map to place the circle center</span>
+                <span className="font-medium">🎯 Click on the map to place the circle center</span>
               )}
-              {drawingTool === 'circle' && circleCenter && !isDrawing && (
-                <span className="font-medium">Circle center placed. Move mouse and click to set radius.</span>
+              {drawingTool === 'circle' && circleCenter && (
+                <span className="font-medium">✅ Circle center placed! Move mouse and click to set radius.</span>
               )}
               {drawingTool === 'polygon' && polygonPoints.length === 0 && (
-                <span className="font-medium">Click on the map to start drawing polygon</span>
+                <span className="font-medium">📐 Click on the map to start drawing polygon</span>
               )}
               {drawingTool === 'polygon' && polygonPoints.length > 0 && (
                 <span className="font-medium">
-                  Polygon: {polygonPoints.length} points added. 
+                  📐 Polygon: {polygonPoints.length} points added. 
                   {polygonPoints.length >= 3 ? " Double-click to finish." : " Add more points."}
                 </span>
-              )}
-              {drawingTool === 'marker' && (
-                <span className="font-medium">Click on the map to place markers</span>
               )}
             </div>
           </div>
@@ -816,7 +814,7 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
                     setFormData({ ...formData, radius });
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  min="1"
+                  min="10"
                   max="50000"
                   required
                 />
