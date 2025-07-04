@@ -23,13 +23,13 @@ http.route({
       return new Response("API key required", { status: 401 });
     }
 
-    // Verify API key
-    const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
-    if (!keyRecord || !keyRecord.permissions.includes("read:locations")) {
-      return new Response("Invalid API key or insufficient permissions", { status: 403 });
-    }
-
     try {
+      // Verify API key
+      const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
+      if (!keyRecord || !keyRecord.permissions.includes("read:locations")) {
+        return new Response("Invalid API key or insufficient permissions", { status: 403 });
+      }
+
       const locations = await ctx.runQuery(internal.api.getSessionLocationsWithAuth, { 
         apiKey,
         sessionId: sessionId as any 
@@ -68,13 +68,13 @@ http.route({
       return new Response("API key required", { status: 401 });
     }
 
-    // Verify API key
-    const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
-    if (!keyRecord || !keyRecord.permissions.includes("read:alerts")) {
-      return new Response("Invalid API key or insufficient permissions", { status: 403 });
-    }
-
     try {
+      // Verify API key
+      const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
+      if (!keyRecord || !keyRecord.permissions.includes("read:alerts")) {
+        return new Response("Invalid API key or insufficient permissions", { status: 403 });
+      }
+
       const alerts = await ctx.runQuery(internal.api.getSessionAlertsWithAuth, { 
         apiKey,
         sessionId: sessionId as any 
@@ -113,13 +113,13 @@ http.route({
       return new Response("API key required", { status: 401 });
     }
 
-    // Verify API key
-    const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
-    if (!keyRecord || !keyRecord.permissions.includes("write:alerts")) {
-      return new Response("Invalid API key or insufficient permissions", { status: 403 });
-    }
-
     try {
+      // Verify API key
+      const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
+      if (!keyRecord || !keyRecord.permissions.includes("write:alerts")) {
+        return new Response("Invalid API key or insufficient permissions", { status: 403 });
+      }
+
       const body = await req.json();
       const { type, message, userId } = body;
 
@@ -175,13 +175,13 @@ http.route({
       return new Response("API key required", { status: 401 });
     }
 
-    // Verify API key
-    const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
-    if (!keyRecord || !keyRecord.permissions.includes("read:geofences")) {
-      return new Response("Invalid API key or insufficient permissions", { status: 403 });
-    }
-
     try {
+      // Verify API key
+      const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
+      if (!keyRecord || !keyRecord.permissions.includes("read:geofences")) {
+        return new Response("Invalid API key or insufficient permissions", { status: 403 });
+      }
+
       const geofences = await ctx.runQuery(internal.api.getSessionGeofencesWithAuth, { 
         apiKey,
         sessionId: sessionId as any 
@@ -220,13 +220,13 @@ http.route({
       return new Response("API key required", { status: 401 });
     }
 
-    // Verify API key
-    const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
-    if (!keyRecord || !keyRecord.permissions.includes("write:geofences")) {
-      return new Response("Invalid API key or insufficient permissions", { status: 403 });
-    }
-
     try {
+      // Verify API key
+      const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
+      if (!keyRecord || !keyRecord.permissions.includes("write:geofences")) {
+        return new Response("Invalid API key or insufficient permissions", { status: 403 });
+      }
+
       const body = await req.json();
       const { name, type, shape, center, radius, coordinates, alertOnEntry, alertOnExit, description } = body;
 
@@ -289,13 +289,13 @@ http.route({
       return new Response("API key required", { status: 401 });
     }
 
-    // Verify API key
-    const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
-    if (!keyRecord || !keyRecord.permissions.includes("read:analytics")) {
-      return new Response("Invalid API key or insufficient permissions", { status: 403 });
-    }
-
     try {
+      // Verify API key
+      const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
+      if (!keyRecord || !keyRecord.permissions.includes("read:analytics")) {
+        return new Response("Invalid API key or insufficient permissions", { status: 403 });
+      }
+
       const analytics = await ctx.runQuery(api.geofences.getGeofenceAnalytics, { 
         sessionId: sessionId as any,
         timeRange: timeRange as any,
@@ -335,13 +335,13 @@ http.route({
       return new Response("API key required", { status: 401 });
     }
 
-    // Verify API key
-    const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
-    if (!keyRecord || !keyRecord.permissions.includes("webhook")) {
-      return new Response("Invalid API key or insufficient permissions", { status: 403 });
-    }
-
     try {
+      // Verify API key
+      const keyRecord = await ctx.runQuery(api.api.verifyApiKey, { key: apiKey });
+      if (!keyRecord || !keyRecord.permissions.includes("webhook")) {
+        return new Response("Invalid API key or insufficient permissions", { status: 403 });
+      }
+
       const body = await req.json();
       
       // Log webhook event
@@ -357,19 +357,22 @@ http.route({
       switch (event) {
         case "location_update":
           if (data.userId && data.location) {
-            await ctx.runMutation(api.locations.updateLocation, {
+            await ctx.runMutation(internal.api.updateExternalLocation, {
+              apiKey,
               sessionId: sessionId as any,
+              userId: data.userId,
               location: data.location,
             });
           }
           break;
         case "alert_trigger":
           if (data.type && data.userId) {
-            await ctx.runMutation(api.alerts.sendAlert, {
+            await ctx.runMutation(internal.api.sendExternalAlert, {
+              apiKey,
               sessionId: sessionId as any,
               type: data.type,
               message: data.message,
-              createdBy: data.userId,
+              userId: data.userId,
             });
           }
           break;

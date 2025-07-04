@@ -162,7 +162,7 @@ export function AnalyticsDashboard({ sessionId }: AnalyticsDashboardProps) {
                 <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
                 <div className="flex-1">
                   <div className="font-medium">
-                    {'type' in event ? `Alert: ${event.type}` : `Geofence ${event.eventType}: ${event.geofenceName}`}
+                    {'type' in event ? `Alert: ${event.type}` : `Geofence ${event.eventType}: ${event.geofenceName || 'Unknown'}`}
                   </div>
                   <div className="text-gray-600">
                     {'message' in event ? event.message : `User ${'userName' in event ? event.userName : 'Unknown'}`}

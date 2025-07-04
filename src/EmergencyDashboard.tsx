@@ -54,9 +54,15 @@ export function EmergencyDashboard({ user }: { user: any }) {
       });
       toast.success("Alert sent");
       
-      const audio = new Audio("/alert.mp3");
-      audio.play().catch(console.error);
+      // Play alert sound
+      try {
+        const audio = new Audio("/alert.mp3");
+        audio.play().catch(console.error);
+      } catch (error) {
+        console.error("Failed to play alert sound:", error);
+      }
       
+      // Vibrate if supported
       if (navigator.vibrate) {
         navigator.vibrate([200, 100, 200]);
       }

@@ -53,13 +53,12 @@ function createCustomIcon(name: string, alertStatus: 'none' | 'active' | 'acknow
   });
 }
 
-type GeofenceType = "safe_zone" | "restricted_zone" | "alert_zone";
-
 export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
   const locations = useQuery(api.locations.getSessionLocations, { sessionId }) || [];
   const alerts = useQuery(api.alerts.getSessionAlerts, { sessionId }) || [];
   const geofences = useQuery(api.geofences.getSessionGeofences, { sessionId }) || [];
-  const session = useQuery(api.sessions.listSessions)?.find(s => s && s._id === sessionId);
+  const sessions = useQuery(api.sessions.listSessions) || [];
+  const session = sessions.find(s => s && s._id === sessionId);
   const updateLocation = useMutation(api.locations.updateLocation);
   
   const [watching, setWatching] = useState(false);
@@ -69,13 +68,12 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
   const geofenceLayers = useRef<{ [key: string]: L.Layer }>({});
   const [showList, setShowList] = useState(true);
   const [mapStyle, setMapStyle] = useState('streets');
-  const [showHeatmap, setShowHeatmap] = useState(false);
   const [trackingMode, setTrackingMode] = useState<'none' | 'follow' | 'center'>('none');
   const [showMeasurement, setShowMeasurement] = useState(false);
   const [measurementPoints, setMeasurementPoints] = useState<Array<{ lat: number; lng: number }>>([]);
-  const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const measurementLayer = useRef<L.Layer | null>(null);
+  const tileLayer = useRef<L.TileLayer | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -83,7 +81,7 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
     // Initialize map
     map.current = L.map(mapContainer.current).setView([40.7128, -74.0060], 10);
 
-    // Add tile layer based on style
+    // Add initial tile layer
     const getTileLayer = (style: string) => {
       switch (style) {
         case 'satellite':
@@ -105,14 +103,49 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
       }
     };
 
-    const tileLayer = getTileLayer(mapStyle);
-    tileLayer.addTo(map.current);
+    tileLayer.current = getTileLayer(mapStyle);
+    tileLayer.current.addTo(map.current);
 
     const mapInstance = map.current;
     return () => {
       mapInstance.remove();
       map.current = null;
     };
+  }, []);
+
+  // Handle map style changes
+  useEffect(() => {
+    if (!map.current) return;
+
+    const getTileLayer = (style: string) => {
+      switch (style) {
+        case 'satellite':
+          return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+          });
+        case 'dark':
+          return L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          });
+        case 'terrain':
+          return L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
+          });
+        default: // streets
+          return L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          });
+      }
+    };
+
+    // Remove old tile layer
+    if (tileLayer.current) {
+      map.current.removeLayer(tileLayer.current);
+    }
+
+    // Add new tile layer
+    tileLayer.current = getTileLayer(mapStyle);
+    tileLayer.current.addTo(map.current);
   }, [mapStyle]);
 
   useEffect(() => {
@@ -239,6 +272,31 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
   // Add measurement event handler
   useEffect(() => {
     if (!map.current) return;
+    
+    const handleMeasurementClick = (e: L.LeafletMouseEvent) => {
+      if (!showMeasurement) return;
+      const point = { lat: e.latlng.lat, lng: e.latlng.lng };
+      const newPoints = [...measurementPoints, point];
+      setMeasurementPoints(newPoints);
+      
+      if (newPoints.length >= 2 && map.current) {
+        if (measurementLayer.current) map.current.removeLayer(measurementLayer.current);
+        
+        const line = L.polyline(newPoints.map(p => [p.lat, p.lng] as [number, number]), {
+          color: '#ff6b35', weight: 3, opacity: 0.8, dashArray: '5, 5'
+        });
+        
+        let dist = 0;
+        for (let i = 1; i < newPoints.length; i++) {
+          dist += map.current.distance([newPoints[i-1].lat, newPoints[i-1].lng], [newPoints[i].lat, newPoints[i].lng]);
+        }
+        
+        line.bindPopup(`📏 ${dist > 1000 ? (dist/1000).toFixed(2) + ' km' : dist.toFixed(0) + ' m'}`);
+        line.addTo(map.current);
+        measurementLayer.current = line;
+      }
+    };
+
     map.current.on('click', handleMeasurementClick);
     return () => {
       if (map.current) {
@@ -259,6 +317,7 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
               lat: position.coords.latitude,
               lng: position.coords.longitude,
             },
+            accuracy: position.coords.accuracy,
           });
 
           // Follow user location if tracking mode is enabled
@@ -321,30 +380,6 @@ export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
       },
       { enableHighAccuracy: true, timeout: 15000 }
     );
-  };
-
-  const handleMeasurementClick = (e: L.LeafletMouseEvent) => {
-    if (!showMeasurement) return;
-    const point = { lat: e.latlng.lat, lng: e.latlng.lng };
-    const newPoints = [...measurementPoints, point];
-    setMeasurementPoints(newPoints);
-    
-    if (newPoints.length >= 2 && map.current) {
-      if (measurementLayer.current) map.current.removeLayer(measurementLayer.current);
-      
-      const line = L.polyline(newPoints.map(p => [p.lat, p.lng] as [number, number]), {
-        color: '#ff6b35', weight: 3, opacity: 0.8, dashArray: '5, 5'
-      });
-      
-      let dist = 0;
-      for (let i = 1; i < newPoints.length; i++) {
-        dist += map.current.distance([newPoints[i-1].lat, newPoints[i-1].lng], [newPoints[i].lat, newPoints[i].lng]);
-      }
-      
-      line.bindPopup(`📏 ${dist > 1000 ? (dist/1000).toFixed(2) + ' km' : dist.toFixed(0) + ' m'}`);
-      line.addTo(map.current);
-      measurementLayer.current = line;
-    }
   };
 
   const clearMeasurement = () => {

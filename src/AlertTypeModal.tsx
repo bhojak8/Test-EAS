@@ -75,7 +75,8 @@ export function AlertTypeModal({
   };
 
   const playSound = (sound: string) => {
-    const audio = new Audio(SOUNDS.find(s => s.id === sound)?.file || "/alert.mp3");
+    const soundFile = SOUNDS.find(s => s.id === sound)?.file || "/alert.mp3";
+    const audio = new Audio(soundFile);
     audio.volume = volume;
     audio.play().catch(console.error);
   };
