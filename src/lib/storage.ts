@@ -158,12 +158,12 @@ export class StorageAPI {
 
   static signIn(email: string, password: string, name?: string): User {
     const users = getFromStorage<User>(STORAGE_KEYS.USERS);
-    let user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    let user = users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim());
 
     if (!user) {
       // Create new user (sign up)
       if (!name) {
-        throw new Error('Name is required for new accounts');
+        throw new Error('Name is required to create a new account');
       }
       
       user = {
@@ -174,10 +174,12 @@ export class StorageAPI {
       };
       users.push(user);
       saveToStorage(STORAGE_KEYS.USERS, users);
+      console.log('New user created:', user);
     } else {
       // Existing user (sign in)
       // For simplicity, we're not actually checking passwords in this demo
       // In a real app, you'd verify the password here
+      console.log('Existing user signed in:', user);
     }
 
     this.setCurrentUser(user);

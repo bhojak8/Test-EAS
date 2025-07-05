@@ -27,26 +27,30 @@ export function useAuth() {
       setIsLoading(true);
       
       // Validate inputs
-      if (!email || !email.includes('@')) {
+      if (!email || !email.trim()) {
+        throw new Error('Please enter an email address');
+      }
+      
+      if (!email.includes('@')) {
         throw new Error('Please enter a valid email address');
       }
       
-      if (!password || password.length < 1) {
+      if (!password || password.trim().length < 1) {
         throw new Error('Please enter a password');
       }
 
-      if (name !== undefined && !name.trim()) {
+      // For sign up, name is required
+      if (name !== undefined && (!name || !name.trim())) {
         throw new Error('Please enter your name');
       }
 
-      const user = StorageAPI.signIn(email.trim(), password, name?.trim());
+      const user = StorageAPI.signIn(email.trim(), password.trim(), name?.trim());
       setUser(user);
       return user;
     } catch (error) {
       console.error('Sign in error:', error);
-      throw error;
-    } finally {
       setIsLoading(false);
+      throw error;
     }
   };
 
@@ -58,9 +62,8 @@ export function useAuth() {
       return user;
     } catch (error) {
       console.error('Anonymous sign in error:', error);
-      throw error;
-    } finally {
       setIsLoading(false);
+      throw error;
     }
   };
 
