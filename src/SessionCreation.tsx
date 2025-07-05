@@ -1,57 +1,35 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../convex/_generated/api";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
-import { Id } from "../convex/_generated/dataModel";
+import { StorageAPI } from "./lib/storage";
 
-export function SessionCreation() {
+export function SessionCreation({ user, onSessionCreated }: { user: any; onSessionCreated: () => void }) {
   const [name, setName] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState<Id<"groups"> | null>(null);
-  const [selectedMembers, setSelectedMembers] = useState<Id<"users">[]>([]);
-  const [selectedSession, setSelectedSession] = useState<Id<"sessions"> | null>(null);
-
-  const groups = useQuery(api.groups.listGroups) || [];
-  const groupMembers = useQuery(
-    api.groups.getGroupMembers,
-    selectedGroup ? { groupId: selectedGroup } : "skip"
-  ) || [];
-  
-  const createSession = useMutation(api.sessions.createSession);
-  const sessions = useQuery(api.sessions.listSessions) || [];
+  const [selectedSession, setSelectedSession] = useState<any>(null);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const sessionId = await createSession({
-        name,
-        groupId: selectedGroup || undefined,
-        selectedMembers: selectedMembers.length > 0 ? selectedMembers : undefined,
-      });
-      
-      setSelectedSession(sessionId);
+      const session = StorageAPI.createSession(name, user._id);
+      setSelectedSession(session);
       setName("");
-      setSelectedGroup(null);
-      setSelectedMembers([]);
+      onSessionCreated();
       toast.success("Session created");
     } catch (error) {
       toast.error("Failed to create session");
     }
   };
 
-  const selectedSessionData = selectedSession ? 
-    sessions.find(s => s && s._id === selectedSession) : null;
-
   const handleCopyCode = () => {
-    if (selectedSessionData?.shareCode) {
-      navigator.clipboard.writeText(selectedSessionData.shareCode);
+    if (selectedSession?.shareCode) {
+      navigator.clipboard.writeText(selectedSession.shareCode);
       toast.success("Share code copied to clipboard");
     }
   };
 
   const handleCopyUrl = () => {
-    if (selectedSessionData?.shareCode) {
-      const url = `${window.location.origin}?join=${selectedSessionData.shareCode}`;
+    if (selectedSession?.shareCode) {
+      const url = `${window.location.origin}?join=${selectedSession.shareCode}`;
       navigator.clipboard.writeText(url);
       toast.success("Share URL copied to clipboard");
     }
@@ -68,70 +46,10 @@ export function SessionCreation() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
             required
           />
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Select Group (Optional)
-          </label>
-          <select
-            value={selectedGroup || ""}
-            onChange={(e) => {
-              const groupId = e.target.value as Id<"groups"> | "";
-              setSelectedGroup(groupId || null);
-              setSelectedMembers([]);
-            }}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            <option value="">No group</option>
-            {groups.map((group) => group && (
-              <option key={group._id} value={group._id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {selectedGroup && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Select Members
-            </label>
-            <div className="mt-2 space-y-2">
-              <button
-                type="button"
-                onClick={() => setSelectedMembers(groupMembers.map(m => m.userId))}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                Select All
-              </button>
-              {groupMembers.map((member) => (
-                <label key={member.userId} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={selectedMembers.includes(member.userId)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedMembers([...selectedMembers, member.userId]);
-                      } else {
-                        setSelectedMembers(
-                          selectedMembers.filter((id) => id !== member.userId)
-                        );
-                      }
-                    }}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="ml-2">
-                    {member.name} ({member.role})
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
 
         <button
           type="submit"
@@ -141,13 +59,13 @@ export function SessionCreation() {
         </button>
       </form>
 
-      {selectedSession && selectedSessionData && (
+      {selectedSession && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h3 className="text-lg font-semibold mb-4">Share Session: {selectedSessionData.name}</h3>
+            <h3 className="text-lg font-semibold mb-4">Share Session: {selectedSession.name}</h3>
             <div className="flex justify-center mb-4">
               <QRCodeSVG 
-                value={`${window.location.origin}?join=${selectedSessionData.shareCode}`} 
+                value={`${window.location.origin}?join=${selectedSession.shareCode}`} 
                 size={200} 
                 level="M"
                 includeMargin={true}
@@ -158,7 +76,7 @@ export function SessionCreation() {
                 <p className="text-sm text-gray-600">Share Code:</p>
                 <div className="flex items-center justify-center gap-2">
                   <p className="text-lg font-mono bg-gray-100 px-4 py-2 rounded">
-                    {selectedSessionData.shareCode}
+                    {selectedSession.shareCode}
                   </p>
                   <button
                     onClick={handleCopyCode}
@@ -173,7 +91,7 @@ export function SessionCreation() {
                 <p className="text-sm text-gray-600">Share URL:</p>
                 <div className="flex items-center justify-center gap-2">
                   <p className="text-sm font-mono bg-gray-100 px-4 py-2 rounded truncate max-w-xs">
-                    {`${window.location.origin}?join=${selectedSessionData.shareCode}`}
+                    {`${window.location.origin}?join=${selectedSession.shareCode}`}
                   </p>
                   <button
                     onClick={handleCopyUrl}

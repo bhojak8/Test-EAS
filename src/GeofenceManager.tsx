@@ -1,12 +1,18 @@
-import { useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../convex/_generated/api";
-import { Id } from "../convex/_generated/dataModel";
+import { useState, useEffect } from "react";
+import { StorageAPI, Geofence } from "./lib/storage";
 import { FreeLeafletMap } from './FreeLeafletMap';
 
-export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
-  const geofences = useQuery(api.geofences.getSessionGeofences, { sessionId }) || [];
+export function GeofenceManager({ sessionId }: { sessionId: string }) {
+  const [geofences, setGeofences] = useState<Geofence[]>([]);
   const [activeTab, setActiveTab] = useState<'create' | 'manage' | 'analytics'>('create');
+
+  useEffect(() => {
+    setGeofences(StorageAPI.getSessionGeofences(sessionId));
+  }, [sessionId]);
+
+  const refreshGeofences = () => {
+    setGeofences(StorageAPI.getSessionGeofences(sessionId));
+  };
 
   return (
     <div className="bg-gray-50 rounded-xl p-6 space-y-6">
@@ -58,7 +64,7 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
             </p>
           </div>
           
-          <FreeLeafletMap sessionId={sessionId} mode="geofence" />
+          <FreeLeafletMap sessionId={sessionId} mode="geofence" onGeofenceCreated={refreshGeofences} />
         </div>
       )}
 
@@ -102,6 +108,15 @@ export function GeofenceManager({ sessionId }: { sessionId: Id<"sessions"> }) {
                     </span>
                   )}
                 </div>
+                <button
+                  onClick={() => {
+                    StorageAPI.deleteGeofence(geofence._id);
+                    refreshGeofences();
+                  }}
+                  className="mt-2 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                >
+                  🗑️ Delete
+                </button>
               </div>
             ))}
           </div>

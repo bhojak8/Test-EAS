@@ -1,25 +1,31 @@
 import { useState, useEffect, useRef } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../convex/_generated/api";
-import { Id } from "../convex/_generated/dataModel";
 import { toast } from "sonner";
+import { StorageAPI } from "./lib/storage";
 
 interface SessionChatProps {
-  sessionId: Id<"sessions">;
+  sessionId: string;
   user: any;
 }
 
 export function SessionChat({ sessionId, user }: SessionChatProps) {
   const [message, setMessage] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  const messages = useQuery(api.messages.getSessionMessages, { sessionId }) || [];
-  const sendMessage = useMutation(api.messages.sendMessage);
   
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  useEffect(() => {
+    const loadMessages = () => {
+      setMessages(StorageAPI.getSessionMessages(sessionId));
+    };
+
+    loadMessages();
+    const interval = setInterval(loadMessages, 2000);
+    return () => clearInterval(interval);
+  }, [sessionId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -30,10 +36,7 @@ export function SessionChat({ sessionId, user }: SessionChatProps) {
     if (!message.trim()) return;
 
     try {
-      await sendMessage({
-        sessionId,
-        content: message.trim(),
-      });
+      StorageAPI.sendMessage(sessionId, user._id, message.trim());
       setMessage("");
     } catch (error) {
       toast.error("Failed to send message");

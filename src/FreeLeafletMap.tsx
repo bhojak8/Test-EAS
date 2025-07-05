@@ -1,8 +1,6 @@
 import { useEffect, useState, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../convex/_generated/api";
-import { Id } from "../convex/_generated/dataModel";
 import { toast } from "sonner";
+import { StorageAPI } from "./lib/storage";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
@@ -20,8 +18,9 @@ L.Icon.Default.mergeOptions({
 });
 
 interface FreeLeafletMapProps {
-  sessionId: Id<"sessions">;
+  sessionId: string;
   mode?: 'view' | 'geofence';
+  onGeofenceCreated?: () => void;
 }
 
 // Free map tile providers
@@ -94,15 +93,7 @@ function createCustomIcon(name: string, alertStatus: 'none' | 'active' | 'acknow
   });
 }
 
-export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps) {
-  const locations = useQuery(api.locations.getSessionLocations, { sessionId }) || [];
-  const alerts = useQuery(api.alerts.getSessionAlerts, { sessionId }) || [];
-  const geofences = useQuery(api.geofences.getSessionGeofences, { sessionId }) || [];
-  const sessions = useQuery(api.sessions.listSessions) || [];
-  const session = sessions.find(s => s && s._id === sessionId);
-  const updateLocation = useMutation(api.locations.updateLocation);
-  const createGeofence = useMutation(api.geofences.createGeofence);
-
+export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: FreeLeafletMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const drawControl = useRef<L.Control.Draw | null>(null);
@@ -116,6 +107,9 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
   const [trackingMode, setTrackingMode] = useState<'none' | 'follow' | 'center'>('none');
   const [showGeofenceForm, setShowGeofenceForm] = useState(false);
   const [drawnFeature, setDrawnFeature] = useState<any>(null);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [geofences, setGeofences] = useState<any[]>([]);
   const [geofenceFormData, setGeofenceFormData] = useState({
     name: '',
     type: 'safe_zone' as const,
@@ -123,6 +117,19 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
     alertOnExit: true,
     description: ''
   });
+
+  // Load data
+  useEffect(() => {
+    const loadData = () => {
+      setLocations(StorageAPI.getSessionLocations(sessionId));
+      setAlerts(StorageAPI.getSessionAlerts(sessionId));
+      setGeofences(StorageAPI.getSessionGeofences(sessionId));
+    };
+
+    loadData();
+    const interval = setInterval(loadData, 5000);
+    return () => clearInterval(interval);
+  }, [sessionId]);
 
   // Initialize map
   useEffect(() => {
@@ -202,11 +209,6 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
       map.current.on(L.Draw.Event.DELETED, handleDrawDeleted);
     }
 
-    map.current.on('load', () => {
-      console.log('Free Leaflet map loaded successfully!');
-      toast.success('🗺️ Free high-accuracy map loaded!');
-    });
-
     const mapInstance = map.current;
     return () => {
       if (mapInstance) {
@@ -252,7 +254,6 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
           Date.now() - alert.createdAt < 60000
         );
 
-        const alertType = recentAlert && session?.alertTypes?.find(t => t.id === recentAlert.type);
         const isOffline = member.lastSeen && Date.now() - member.lastSeen > 300000;
         
         // Determine alert status
@@ -274,7 +275,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
           <div class="p-3 min-w-[200px]">
             <h3 class="font-semibold text-lg">${member.name}</h3>
             <p class="text-sm text-gray-600">${member.role}</p>
-            ${recentAlert ? `<p class="text-sm text-red-600 mt-1">${alertType?.emoji} ${alertType?.label}</p>` : ''}
+            ${recentAlert ? `<p class="text-sm text-red-600 mt-1">🚨 ${recentAlert.type}</p>` : ''}
             ${isOffline ? '<p class="text-sm text-gray-500 mt-1">📴 Offline</p>' : ''}
             <div class="mt-2 space-y-1">
               <p class="text-xs text-gray-500">📍 ${member.location.lat.toFixed(6)}, ${member.location.lng.toFixed(6)}</p>
@@ -297,7 +298,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
         map.current.fitBounds(group.getBounds(), { padding: [20, 20] });
       }
     }
-  }, [locations, alerts, session?.alertTypes, trackingMode]);
+  }, [locations, alerts, trackingMode]);
 
   // Update geofence layers
   useEffect(() => {
@@ -372,18 +373,22 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
     const watchId = navigator.geolocation.watchPosition(
       async (position) => {
         try {
-          await updateLocation({
-            sessionId,
-            location: {
-              lat: position.coords.latitude,
-              lng: position.coords.longitude,
-            },
-            accuracy: position.coords.accuracy,
-          });
+          const user = StorageAPI.getCurrentUser();
+          if (user) {
+            StorageAPI.updateLocation(
+              sessionId,
+              user._id,
+              {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+              },
+              position.coords.accuracy
+            );
 
-          // Follow user location if tracking mode is enabled
-          if (trackingMode === 'follow' && map.current) {
-            map.current.setView([position.coords.latitude, position.coords.longitude], 15);
+            // Follow user location if tracking mode is enabled
+            if (trackingMode === 'follow' && map.current) {
+              map.current.setView([position.coords.latitude, position.coords.longitude], 15);
+            }
           }
         } catch (error) {
           console.error("Failed to update location:", error);
@@ -401,7 +406,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [sessionId, watching, updateLocation, trackingMode]);
+  }, [sessionId, watching, trackingMode]);
 
   // Drawing event handlers
   const handleDrawCreated = (e: any) => {
@@ -429,6 +434,9 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
     }
 
     try {
+      const user = StorageAPI.getCurrentUser();
+      if (!user) return;
+
       let geofenceData: any = {
         sessionId,
         name: geofenceFormData.name,
@@ -436,6 +444,8 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
         alertOnEntry: geofenceFormData.alertOnEntry,
         alertOnExit: geofenceFormData.alertOnExit,
         description: geofenceFormData.description,
+        active: true,
+        createdBy: user._id,
       };
 
       if (drawnFeature instanceof L.Circle) {
@@ -453,7 +463,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
         }));
       }
 
-      await createGeofence(geofenceData);
+      StorageAPI.createGeofence(geofenceData);
       
       // Clear the drawing
       drawnItems.current.clearLayers();
@@ -467,6 +477,10 @@ export function FreeLeafletMap({ sessionId, mode = 'view' }: FreeLeafletMapProps
         alertOnExit: true,
         description: ''
       });
+      
+      if (onGeofenceCreated) {
+        onGeofenceCreated();
+      }
       
       toast.success('✅ Geofence created successfully!');
     } catch (error) {

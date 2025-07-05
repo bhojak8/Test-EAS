@@ -1,17 +1,6 @@
 import { useState } from "react";
-import { useMutation } from "convex/react";
-import { api } from "../convex/_generated/api";
-import { Id } from "../convex/_generated/dataModel";
 import { toast } from "sonner";
-
-type AlertType = {
-  id: string;
-  label: string;
-  color: string;
-  emoji: string;
-  category?: string;
-  sound?: string;
-};
+import { StorageAPI, AlertType } from "./lib/storage";
 
 const CATEGORIES = [
   "Fire & Safety",
@@ -34,25 +23,24 @@ export function AlertTypeModal({
   onClose,
   isCreator,
   sessionId,
+  onUpdate,
 }: {
   alertTypes: AlertType[];
   onSelect: (type: string) => void;
   onClose: () => void;
   isCreator: boolean;
-  sessionId: Id<"sessions">;
+  sessionId: string;
+  onUpdate: () => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTypes, setEditedTypes] = useState(alertTypes);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const updateAlertTypes = useMutation(api.sessions.updateAlertTypes);
   const [volume, setVolume] = useState(0.5);
 
   const handleSave = async () => {
     try {
-      await updateAlertTypes({
-        sessionId,
-        alertTypes: editedTypes,
-      });
+      StorageAPI.updateAlertTypes(sessionId, editedTypes);
+      onUpdate();
       toast.success("Alert types updated");
       setIsEditing(false);
     } catch (error) {

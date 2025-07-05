@@ -1,6 +1,5 @@
 import { FreeLeafletMap } from './FreeLeafletMap';
-import { Id } from "../convex/_generated/dataModel";
 
-export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
+export function EmergencyMap({ sessionId }: { sessionId: string }) {
   return <FreeLeafletMap sessionId={sessionId} mode="view" />;
 }
