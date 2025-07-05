@@ -158,18 +158,26 @@ export class StorageAPI {
 
   static signIn(email: string, password: string, name?: string): User {
     const users = getFromStorage<User>(STORAGE_KEYS.USERS);
-    let user = users.find(u => u.email === email);
+    let user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
     if (!user) {
-      // Create new user
+      // Create new user (sign up)
+      if (!name) {
+        throw new Error('Name is required for new accounts');
+      }
+      
       user = {
         _id: uuidv4(),
-        name: name || email.split('@')[0],
-        email,
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
         createdAt: Date.now(),
       };
       users.push(user);
       saveToStorage(STORAGE_KEYS.USERS, users);
+    } else {
+      // Existing user (sign in)
+      // For simplicity, we're not actually checking passwords in this demo
+      // In a real app, you'd verify the password here
     }
 
     this.setCurrentUser(user);
@@ -179,7 +187,7 @@ export class StorageAPI {
   static signInAnonymous(): User {
     const user: User = {
       _id: uuidv4(),
-      name: `User ${Math.random().toString(36).substring(2, 8)}`,
+      name: `Anonymous User ${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
       email: `anonymous_${Date.now()}@temp.com`,
       createdAt: Date.now(),
     };
@@ -192,7 +200,11 @@ export class StorageAPI {
   }
 
   static signOut(): void {
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   }
 
   // Session management

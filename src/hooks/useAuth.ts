@@ -6,34 +6,71 @@ export function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const currentUser = StorageAPI.getCurrentUser();
-    setUser(currentUser);
-    setIsLoading(false);
+    // Check for existing user on mount
+    const checkCurrentUser = () => {
+      try {
+        const currentUser = StorageAPI.getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Error loading current user:', error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkCurrentUser();
   }, []);
 
-  const signIn = async (email: string, password: string, name?: string) => {
+  const signIn = async (email: string, password: string, name?: string): Promise<User> => {
     try {
-      const user = StorageAPI.signIn(email, password, name);
+      setIsLoading(true);
+      
+      // Validate inputs
+      if (!email || !email.includes('@')) {
+        throw new Error('Please enter a valid email address');
+      }
+      
+      if (!password || password.length < 1) {
+        throw new Error('Please enter a password');
+      }
+
+      if (name !== undefined && !name.trim()) {
+        throw new Error('Please enter your name');
+      }
+
+      const user = StorageAPI.signIn(email.trim(), password, name?.trim());
       setUser(user);
       return user;
     } catch (error) {
+      console.error('Sign in error:', error);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const signInAnonymous = async () => {
+  const signInAnonymous = async (): Promise<User> => {
     try {
+      setIsLoading(true);
       const user = StorageAPI.signInAnonymous();
       setUser(user);
       return user;
     } catch (error) {
+      console.error('Anonymous sign in error:', error);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const signOut = () => {
-    StorageAPI.signOut();
-    setUser(null);
+    try {
+      StorageAPI.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
   };
 
   return {
