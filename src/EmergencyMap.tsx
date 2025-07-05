@@ -1,6 +1,6 @@
-import { MapboxMap } from './MapboxMap';
+import { FreeLeafletMap } from './FreeLeafletMap';
 import { Id } from "../convex/_generated/dataModel";
 
 export function EmergencyMap({ sessionId }: { sessionId: Id<"sessions"> }) {
-  return <MapboxMap sessionId={sessionId} mode="view" />;
+  return <FreeLeafletMap sessionId={sessionId} mode="view" />;
 }
