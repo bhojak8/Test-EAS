@@ -9,117 +9,6 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 
-// Initialize L.drawLocal to prevent "type is not defined" errors
-L.drawLocal = {
-  draw: {
-    toolbar: {
-      actions: {
-        title: 'Cancel drawing',
-        text: 'Cancel'
-      },
-      finish: {
-        title: 'Finish drawing',
-        text: 'Finish'
-      },
-      undo: {
-        title: 'Delete last point drawn',
-        text: 'Delete last point'
-      },
-      buttons: {
-        polyline: 'Draw a polyline',
-        polygon: 'Draw a polygon',
-        rectangle: 'Draw a rectangle',
-        circle: 'Draw a circle',
-        marker: 'Draw a marker',
-        circlemarker: 'Draw a circlemarker'
-      }
-    },
-    handlers: {
-      circle: {
-        tooltip: {
-          start: 'Click and drag to draw circle.'
-        },
-        radius: {
-          title: 'Radius',
-          unit: 'm'
-        }
-      },
-      circlemarker: {
-        tooltip: {
-          start: 'Click map to place circle marker.'
-        }
-      },
-      marker: {
-        tooltip: {
-          start: 'Click map to place marker.'
-        }
-      },
-      polygon: {
-        tooltip: {
-          start: 'Click to start drawing shape.',
-          cont: 'Click to continue drawing shape.',
-          end: 'Click first point to close this shape.'
-        }
-      },
-      polyline: {
-        error: '<strong>Error:</strong> shape edges cannot cross!',
-        tooltip: {
-          start: 'Click to start drawing line.',
-          cont: 'Click to continue drawing line.',
-          end: 'Click last point to finish line.'
-        }
-      },
-      rectangle: {
-        tooltip: {
-          start: 'Click and drag to draw rectangle.'
-        }
-      },
-      simpleshape: {
-        tooltip: {
-          end: 'Release mouse to finish drawing.'
-        }
-      }
-    }
-  },
-  edit: {
-    toolbar: {
-      actions: {
-        save: {
-          title: 'Save changes',
-          text: 'Save'
-        },
-        cancel: {
-          title: 'Cancel editing, discards all changes',
-          text: 'Cancel'
-        },
-        clearAll: {
-          title: 'Clear all layers',
-          text: 'Clear All'
-        }
-      },
-      buttons: {
-        edit: 'Edit layers',
-        editDisabled: 'No layers to edit',
-        remove: 'Delete layers',
-        removeDisabled: 'No layers to delete'
-      }
-    },
-    handlers: {
-      edit: {
-        tooltip: {
-          text: 'Drag handles or markers to edit features.',
-          subtext: 'Click cancel to undo changes.'
-        }
-      },
-      remove: {
-        tooltip: {
-          text: 'Click on a feature to remove.'
-        }
-      }
-    }
-  }
-};
-
 // Fix for default markers in Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -204,6 +93,32 @@ function createCustomIcon(name: string, alertStatus: 'none' | 'active' | 'acknow
   });
 }
 
+// Helper function to calculate distance between two points
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Helper function to check if point is inside polygon
+function isPointInPolygon(lat: number, lng: number, polygon: Array<{lat: number, lng: number}>): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lat, yi = polygon[i].lng;
+    const xj = polygon[j].lat, yj = polygon[j].lng;
+    
+    if (((yi > lng) !== (yj > lng)) && (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: FreeLeafletMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -212,6 +127,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
   const markers = useRef<{ [key: string]: L.Marker }>({});
   const geofenceLayers = useRef<{ [key: string]: L.Layer }>({});
   const markerCluster = useRef<L.MarkerClusterGroup | null>(null);
+  const userLocationHistory = useRef<Array<{lat: number, lng: number, timestamp: number}>>([]);
 
   const [watching, setWatching] = useState(false);
   const [currentProvider, setCurrentProvider] = useState('osm');
@@ -477,7 +393,128 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
     });
   }, [geofences]);
 
-  // Handle geolocation
+  // Enhanced geofence violation checking
+  const checkGeofenceViolations = (lat: number, lng: number) => {
+    const currentUser = StorageAPI.getCurrentUser();
+    if (!currentUser) return;
+
+    const currentTime = Date.now();
+    const currentLocation = { lat, lng, timestamp: currentTime };
+    
+    // Add to location history
+    userLocationHistory.current.push(currentLocation);
+    
+    // Keep only last 10 locations for movement detection
+    if (userLocationHistory.current.length > 10) {
+      userLocationHistory.current = userLocationHistory.current.slice(-10);
+    }
+
+    geofences.forEach(geofence => {
+      if (!geofence.active) return;
+
+      let isCurrentlyInside = false;
+      let wasInsideBefore = false;
+
+      // Check current position
+      if (geofence.shape === 'circle' && geofence.center && geofence.radius) {
+        const distance = calculateDistance(lat, lng, geofence.center.lat, geofence.center.lng);
+        isCurrentlyInside = distance <= geofence.radius;
+      } else if (geofence.shape === 'polygon' && geofence.coordinates && geofence.coordinates.length >= 3) {
+        isCurrentlyInside = isPointInPolygon(lat, lng, geofence.coordinates);
+      }
+
+      // Check previous position if we have history
+      if (userLocationHistory.current.length > 1) {
+        const previousLocation = userLocationHistory.current[userLocationHistory.current.length - 2];
+        
+        if (geofence.shape === 'circle' && geofence.center && geofence.radius) {
+          const prevDistance = calculateDistance(
+            previousLocation.lat, 
+            previousLocation.lng, 
+            geofence.center.lat, 
+            geofence.center.lng
+          );
+          wasInsideBefore = prevDistance <= geofence.radius;
+        } else if (geofence.shape === 'polygon' && geofence.coordinates && geofence.coordinates.length >= 3) {
+          wasInsideBefore = isPointInPolygon(previousLocation.lat, previousLocation.lng, geofence.coordinates);
+        }
+      }
+
+      // Detect entry/exit events
+      const justEntered = isCurrentlyInside && !wasInsideBefore;
+      const justExited = !isCurrentlyInside && wasInsideBefore;
+
+      // Handle geofence events
+      if (justEntered && geofence.alertOnEntry) {
+        const message = `${currentUser.name} entered ${geofence.type.replace('_', ' ')}: ${geofence.name}`;
+        
+        // Send alert to session
+        try {
+          StorageAPI.sendAlert(sessionId, currentUser._id, 'geofence_entry', message);
+        } catch (error) {
+          console.error('Failed to send geofence entry alert:', error);
+        }
+
+        // Show notification based on geofence type
+        if (geofence.type === 'restricted_zone') {
+          toast.error(`🚨 RESTRICTED ZONE: ${geofence.name}`, {
+            duration: 10000,
+            description: 'You have entered a restricted area!'
+          });
+          
+          // Play alert sound
+          try {
+            const audio = new Audio("/alert.mp3");
+            audio.volume = 0.8;
+            audio.play().catch(console.error);
+          } catch (error) {
+            console.error("Failed to play alert sound:", error);
+          }
+          
+          // Vibrate if supported
+          if (navigator.vibrate) {
+            navigator.vibrate([500, 200, 500, 200, 500]);
+          }
+        } else if (geofence.type === 'safe_zone') {
+          toast.success(`✅ SAFE ZONE: ${geofence.name}`, {
+            duration: 5000,
+            description: 'You have entered a safe area'
+          });
+        } else if (geofence.type === 'alert_zone') {
+          toast.warning(`⚠️ ALERT ZONE: ${geofence.name}`, {
+            duration: 8000,
+            description: 'You have entered an alert zone - proceed with caution'
+          });
+        }
+      }
+
+      if (justExited && geofence.alertOnExit) {
+        const message = `${currentUser.name} exited ${geofence.type.replace('_', ' ')}: ${geofence.name}`;
+        
+        // Send alert to session
+        try {
+          StorageAPI.sendAlert(sessionId, currentUser._id, 'geofence_exit', message);
+        } catch (error) {
+          console.error('Failed to send geofence exit alert:', error);
+        }
+
+        // Show notification based on geofence type
+        if (geofence.type === 'safe_zone') {
+          toast.warning(`⚠️ LEFT SAFE ZONE: ${geofence.name}`, {
+            duration: 8000,
+            description: 'You have left a safe area'
+          });
+        } else {
+          toast.info(`📍 LEFT ZONE: ${geofence.name}`, {
+            duration: 5000,
+            description: `You have left ${geofence.type.replace('_', ' ')}`
+          });
+        }
+      }
+    });
+  };
+
+  // Handle geolocation with enhanced geofence checking
   useEffect(() => {
     if (!watching) return;
 
@@ -496,6 +533,9 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
               position.coords.accuracy
             );
 
+            // Check geofence violations with current position
+            checkGeofenceViolations(position.coords.latitude, position.coords.longitude);
+
             // Follow user location if tracking mode is enabled
             if (trackingMode === 'follow' && map.current) {
               map.current.setView([position.coords.latitude, position.coords.longitude], 15);
@@ -507,17 +547,17 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
       },
       (error) => {
         console.error("Geolocation error:", error);
-        toast.error("Failed to get location");
+        toast.error("Failed to get location - geofencing may not work properly");
       },
       {
         enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0
+        timeout: 10000,
+        maximumAge: 1000 // Reduce maximum age for more frequent updates
       }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [sessionId, watching, trackingMode]);
+  }, [sessionId, watching, trackingMode, geofences]);
 
   // Drawing event handlers
   const handleDrawCreated = (e: any) => {
@@ -530,6 +570,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
 
   const handleDrawEdited = (e: any) => {
     console.log('Features edited:', e.layers);
+    toast.info('Geofence updated');
   };
 
   const handleDrawDeleted = (e: any) => {
@@ -537,24 +578,27 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
     toast.info('Geofence deleted');
   };
 
-  // Save geofence
+  // Enhanced save geofence with better validation
   const saveGeofence = async () => {
-    if (!drawnFeature || !geofenceFormData.name) {
+    if (!drawnFeature || !geofenceFormData.name.trim()) {
       toast.error('Please provide a name for the geofence');
       return;
     }
 
     try {
       const user = StorageAPI.getCurrentUser();
-      if (!user) return;
+      if (!user) {
+        toast.error('User not authenticated');
+        return;
+      }
 
       let geofenceData: any = {
         sessionId,
-        name: geofenceFormData.name,
+        name: geofenceFormData.name.trim(),
         type: geofenceFormData.type,
         alertOnEntry: geofenceFormData.alertOnEntry,
         alertOnExit: geofenceFormData.alertOnExit,
-        description: geofenceFormData.description,
+        description: geofenceFormData.description.trim(),
         active: true,
         createdBy: user._id,
       };
@@ -565,16 +609,36 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
           lat: drawnFeature.getLatLng().lat,
           lng: drawnFeature.getLatLng().lng
         };
-        geofenceData.radius = drawnFeature.getRadius();
+        geofenceData.radius = Math.round(drawnFeature.getRadius());
+        
+        // Validate circle
+        if (geofenceData.radius < 10) {
+          toast.error('Geofence radius must be at least 10 meters');
+          return;
+        }
+        if (geofenceData.radius > 50000) {
+          toast.error('Geofence radius cannot exceed 50 kilometers');
+          return;
+        }
       } else if (drawnFeature instanceof L.Polygon || drawnFeature instanceof L.Rectangle) {
         geofenceData.shape = 'polygon';
-        geofenceData.coordinates = drawnFeature.getLatLngs()[0].map((latlng: L.LatLng) => ({
+        const latLngs = drawnFeature.getLatLngs()[0];
+        geofenceData.coordinates = latLngs.map((latlng: L.LatLng) => ({
           lat: latlng.lat,
           lng: latlng.lng
         }));
+        
+        // Validate polygon
+        if (geofenceData.coordinates.length < 3) {
+          toast.error('Polygon must have at least 3 points');
+          return;
+        }
+      } else {
+        toast.error('Unsupported geofence shape');
+        return;
       }
 
-      StorageAPI.createGeofence(geofenceData);
+      const geofenceId = StorageAPI.createGeofence(geofenceData);
       
       // Clear the drawing
       drawnItems.current.clearLayers();
@@ -593,8 +657,11 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
         onGeofenceCreated();
       }
       
-      toast.success('✅ Geofence created successfully!');
+      toast.success(`✅ Geofence "${geofenceData.name}" created successfully!`, {
+        description: `${geofenceData.shape === 'circle' ? `Radius: ${geofenceData.radius}m` : `Points: ${geofenceData.coordinates.length}`}`
+      });
     } catch (error) {
+      console.error('Failed to create geofence:', error);
       toast.error('Failed to create geofence');
     }
   };
@@ -606,10 +673,15 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
         return;
       }
       setWatching(true);
-      toast.success("🎯 Free high-accuracy location tracking enabled!");
+      toast.success("🎯 Free high-accuracy location tracking enabled!", {
+        description: "Geofencing is now active"
+      });
     } else {
       setWatching(false);
-      toast.success("Location tracking disabled");
+      userLocationHistory.current = []; // Clear location history
+      toast.success("Location tracking disabled", {
+        description: "Geofencing is now inactive"
+      });
     }
   };
 
@@ -716,13 +788,13 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
         </div>
       </div>
 
-      {/* Free Map Benefits */}
+      {/* Enhanced Free Map Benefits */}
       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <h4 className="font-semibold text-green-900 mb-2">✅ 100% Free Mapping Solution</h4>
+        <h4 className="font-semibold text-green-900 mb-2">✅ 100% Free Advanced Geofencing</h4>
         <div className="text-green-800 text-sm grid grid-cols-1 md:grid-cols-3 gap-2">
           <div>🌍 OpenStreetMap - No API keys needed</div>
           <div>🎯 High accuracy GPS tracking</div>
-          <div>🔄 Unlimited usage</div>
+          <div>🚨 Real-time geofence alerts</div>
         </div>
       </div>
 
@@ -733,6 +805,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
           <p className="text-blue-800 text-sm">
             Use the drawing tools on the left side of the map to create geofences. 
             Draw polygons, circles, or rectangles, then configure the geofence properties.
+            Geofences will automatically detect entry/exit events when location tracking is enabled.
           </p>
         </div>
       )}
@@ -744,18 +817,23 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
           className="h-[600px] rounded-lg overflow-hidden shadow-lg border-2 border-gray-200"
         />
         
-        {/* Status Indicator */}
+        {/* Enhanced Status Indicator */}
         <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-3">
           <div className="flex items-center gap-2 text-sm">
             <div className={`w-3 h-3 rounded-full ${watching ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
             <span className="font-medium">
-              {watching ? '🎯 Free GPS Active' : '📍 GPS Disabled'}
+              {watching ? '🎯 Free GPS + Geofencing Active' : '📍 GPS Disabled'}
             </span>
           </div>
+          {watching && geofences.length > 0 && (
+            <div className="text-xs text-gray-600 mt-1">
+              Monitoring {geofences.length} geofence{geofences.length !== 1 ? 's' : ''}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Geofence Configuration Form */}
+      {/* Enhanced Geofence Configuration Form */}
       {showGeofenceForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
@@ -763,7 +841,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
                 <input
                   type="text"
                   value={geofenceFormData.name}
@@ -771,6 +849,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter geofence name"
                   required
+                  maxLength={50}
                 />
               </div>
               
@@ -781,31 +860,34 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
                   onChange={(e) => setGeofenceFormData({ ...geofenceFormData, type: e.target.value as any })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="safe_zone">🛡️ Safe Zone</option>
-                  <option value="restricted_zone">🚫 Restricted Zone</option>
-                  <option value="alert_zone">⚠️ Alert Zone</option>
+                  <option value="safe_zone">🛡️ Safe Zone - Secure area</option>
+                  <option value="restricted_zone">🚫 Restricted Zone - No entry</option>
+                  <option value="alert_zone">⚠️ Alert Zone - Caution required</option>
                 </select>
               </div>
               
-              <div className="flex items-center space-x-6">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={geofenceFormData.alertOnEntry}
-                    onChange={(e) => setGeofenceFormData({ ...geofenceFormData, alertOnEntry: e.target.checked })}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="ml-2 text-sm">🔔 Alert on Entry</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={geofenceFormData.alertOnExit}
-                    onChange={(e) => setGeofenceFormData({ ...geofenceFormData, alertOnExit: e.target.checked })}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="ml-2 text-sm">🔔 Alert on Exit</span>
-                </label>
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700">Alert Settings</label>
+                <div className="flex flex-col space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={geofenceFormData.alertOnEntry}
+                      onChange={(e) => setGeofenceFormData({ ...geofenceFormData, alertOnEntry: e.target.checked })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm">🔔 Alert when entering this zone</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={geofenceFormData.alertOnExit}
+                      onChange={(e) => setGeofenceFormData({ ...geofenceFormData, alertOnExit: e.target.checked })}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-2 text-sm">🔔 Alert when leaving this zone</span>
+                  </label>
+                </div>
               </div>
               
               <div>
@@ -816,6 +898,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   rows={3}
                   placeholder="Optional description"
+                  maxLength={200}
                 />
               </div>
             </div>
@@ -823,7 +906,7 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
             <div className="flex gap-3 mt-6">
               <button
                 onClick={saveGeofence}
-                disabled={!geofenceFormData.name}
+                disabled={!geofenceFormData.name.trim()}
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
               >
                 💾 Save Free Geofence
@@ -859,10 +942,16 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
               <div className="w-3 h-3 bg-green-600 rounded-full"></div>
               🗺️ {geofences.length} geofences
             </span>
+            {watching && (
+              <span className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-purple-600 rounded-full animate-pulse"></div>
+                🎯 Geofencing active
+              </span>
+            )}
           </div>
           
           <div className="text-xs text-gray-500">
-            🆓 Free OpenStreetMap - No API Keys Required
+            🆓 Free OpenStreetMap + Advanced Geofencing
           </div>
         </div>
       </div>
