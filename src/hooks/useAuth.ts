@@ -62,11 +62,9 @@ export function useAuth() {
       setIsLoading(true);
       const user = StorageAPI.signInAnonymous();
       setUser(user);
-      setIsLoading(false);
       return user;
     } catch (error) {
       console.error('Anonymous sign in error:', error);
-      setIsLoading(false);
       throw error;
     } finally {
       setIsLoading(false);

@@ -187,18 +187,25 @@ export class StorageAPI {
   }
 
   static signInAnonymous(): User {
-    const user: User = {
-      _id: uuidv4(),
-      name: `Anonymous User ${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-      email: `anonymous_${Date.now()}@temp.com`,
-      createdAt: Date.now(),
-    };
+    try {
+      const user: User = {
+        _id: uuidv4(),
+        name: `Anonymous User ${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+        email: `anonymous_${Date.now()}@temp.com`,
+        createdAt: Date.now(),
+      };
 
-    const users = getFromStorage<User>(STORAGE_KEYS.USERS);
-    users.push(user);
-    saveToStorage(STORAGE_KEYS.USERS, users);
-    this.setCurrentUser(user);
-    return user;
+      const users = getFromStorage<User>(STORAGE_KEYS.USERS);
+      users.push(user);
+      saveToStorage(STORAGE_KEYS.USERS, users);
+      this.setCurrentUser(user);
+      
+      console.log('Anonymous user created successfully:', user);
+      return user;
+    } catch (error) {
+      console.error('Error creating anonymous user:', error);
+      throw new Error('Failed to create anonymous user account');
+    }
   }
 
   static signOut(): void {

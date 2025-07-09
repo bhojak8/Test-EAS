@@ -59,13 +59,16 @@ export function SignInForm() {
   };
 
   const handleAnonymousSignIn = async () => {
+    if (submitting) return;
+    
     setSubmitting(true);
     try {
       await signInAnonymous();
       toast.success("🎭 Signed in anonymously!");
     } catch (error: any) {
       console.error('Anonymous sign in error:', error);
-      toast.error("Failed to sign in anonymously");
+      const errorMessage = error?.message || 'Failed to sign in anonymously';
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
