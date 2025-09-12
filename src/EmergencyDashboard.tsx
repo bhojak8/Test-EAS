@@ -63,7 +63,7 @@ export function EmergencyDashboard({ user }: { user: any }) {
       
       // Play alert sound
       try {
-        const audio = new Audio("/alert.mp3");
+        const audio = new Audio("https://www.soundjay.com/misc/sounds/fail-buzzer-02.wav");
         audio.volume = 0.7;
         audio.play().catch(console.error);
       } catch (error) {

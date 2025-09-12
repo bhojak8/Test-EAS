@@ -12,9 +12,9 @@ const CATEGORIES = [
 ];
 
 const SOUNDS = [
-  { id: "urgent", label: "Urgent Alarm", file: "/urgent-alarm.mp3" },
-  { id: "siren", label: "Emergency Siren", file: "/alert.mp3" },
-  { id: "bell", label: "Warning Bell", file: "/bell.mp3" },
+  { id: "urgent", label: "Urgent Alarm", file: "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav" },
+  { id: "siren", label: "Emergency Siren", file: "https://www.soundjay.com/misc/sounds/fail-buzzer-02.wav" },
+  { id: "bell", label: "Warning Bell", file: "https://www.soundjay.com/misc/sounds/bell-ringing-04.wav" },
 ];
 
 export function AlertTypeModal({

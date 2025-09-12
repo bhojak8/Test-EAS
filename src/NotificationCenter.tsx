@@ -31,7 +31,7 @@ export function NotificationCenter({ sessionId, userId }: NotificationCenterProp
   useEffect(() => {
     // Play sound and vibrate for new alerts
     if (recentAlerts.length > 0 && soundEnabled) {
-      const audio = new Audio("/alert.mp3");
+      const audio = new Audio("https://www.soundjay.com/misc/sounds/fail-buzzer-02.wav");
       audio.play().catch(console.error);
     }
 
