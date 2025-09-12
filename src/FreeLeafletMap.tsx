@@ -204,19 +204,22 @@ export function FreeLeafletMap({ sessionId, mode = 'view', onGeofenceCreated }: 
             shapeOptions: {
               color: '#3b82f6',
               fillOpacity: 0.3
-            }
+            },
+            tooltip: false
           },
           circle: {
             shapeOptions: {
               color: '#3b82f6',
               fillOpacity: 0.3
-            }
+            },
+            tooltip: false
           },
           rectangle: {
             shapeOptions: {
               color: '#3b82f6',
               fillOpacity: 0.3
-            }
+            },
+            tooltip: false
           },
           polyline: false,
           marker: false,
